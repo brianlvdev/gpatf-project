@@ -15,6 +15,9 @@ export interface Student {
   emergency_contact_phone: string;
   comorbidities: string;
   avatar_path: string | null;
+  medical_certificate_path: string | null;
+  medical_certificate_issued_on: string | null;
+  medical_certificate_expires_on: string | null;
   status: StudentStatus;
   created_at: string;
   updated_at: string;
@@ -25,6 +28,7 @@ export interface WorkoutSchedule {
   student_id: string;
   title: string;
   description: string;
+  workout_plan: string | null;
   scheduled_date: string;
   start_time: string;
   end_time: string | null;

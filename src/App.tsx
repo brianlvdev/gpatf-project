@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
-import AuthScreen, { AuthRole, SignupValues } from '@/components/AuthScreen';
+import AuthScreen, { AuthRole } from '@/components/AuthScreen';
 import AdminDashboard from '@/components/AdminDashboard';
 import StudentDashboard from '@/components/StudentDashboard';
-import { supabase, ADMIN_EMAIL, ADMIN_AUTH_PASSWORD, accountEmailFromIdentifier, accountEmailFromName, accountEmailFromPhone, FILE_BUCKET } from '@/lib/supabase';
+import { supabase, accountEmailFromIdentifier, FILE_BUCKET } from '@/lib/supabase';
 import { AbsenceJustification, Announcement, Attendance, AttendanceConfirmation, AttendanceStatus, Student, StudentStatus, WorkoutSchedule } from '@/types';
+
+import { registerAccount } from '@/lib/registration';
 
 const genericError = 'Não foi possível concluir agora. Confira os dados e tente novamente.';
 
@@ -36,7 +38,7 @@ function App() {
       if (mounted) setIsBooting(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {
         setSession(null);
         setRole(null);
@@ -50,11 +52,6 @@ function App() {
         setAvatarUrl(null);
         return;
       }
-      if (nextSession && event === 'SIGNED_IN') {
-        (async () => {
-          await loadSessionData(nextSession);
-        })();
-      }
     });
 
     return () => {
@@ -65,7 +62,7 @@ function App() {
 
   async function loadSessionData(nextSession: Session) {
     setSession(nextSession);
-    if (nextSession.user.email === ADMIN_EMAIL) {
+    if (['admin', 'master'].includes(nextSession.user.app_metadata.gpatf_role)) {
       setRole('admin');
       await loadAdminData();
       return;
@@ -112,20 +109,22 @@ function App() {
   }
 
   async function loadAdminData() {
-    const [studentsResponse, scheduleResponse, attendanceResponse, justificationResponse, announcementResponse] = await Promise.all([
+    const [studentsResponse, scheduleResponse, attendanceResponse, confirmationResponse, justificationResponse, announcementResponse] = await Promise.all([
       supabase.from('students').select('*').order('full_name', { ascending: true }),
       supabase.from('workout_schedules').select('*').order('scheduled_date', { ascending: true }),
       supabase.from('attendance').select('*').order('attendance_date', { ascending: false }),
+      supabase.from('attendance_confirmations').select('*').order('attendance_date', { ascending: false }),
       supabase.from('absence_justifications').select('*').order('created_at', { ascending: false }),
       supabase.from('announcements').select('*').order('created_at', { ascending: false }),
     ]);
-    if (studentsResponse.error || scheduleResponse.error || attendanceResponse.error || justificationResponse.error || announcementResponse.error) {
+    if (studentsResponse.error || scheduleResponse.error || attendanceResponse.error || confirmationResponse.error || justificationResponse.error || announcementResponse.error) {
       setAuthError(genericError);
       return;
     }
     setStudents((studentsResponse.data ?? []) as Student[]);
     setSchedules((scheduleResponse.data ?? []) as WorkoutSchedule[]);
     setAttendance((attendanceResponse.data ?? []) as Attendance[]);
+    setConfirmations((confirmationResponse.data ?? []) as AttendanceConfirmation[]);
     setJustifications((justificationResponse.data ?? []) as AbsenceJustification[]);
     setAnnouncements((announcementResponse.data ?? []) as Announcement[]);
   }
@@ -135,69 +134,37 @@ function App() {
     setAuthError('');
     setNotice('');
     try {
-      const email = loginRole === 'admin' ? ADMIN_EMAIL : accountEmailFromIdentifier(identifier);
-      let authSession: Session | null = null;
-      if (loginRole === 'admin') {
-        if (identifier.trim().toLowerCase() !== 'adm' || password !== 'adm123') throw new Error('login');
-        const signInResponse = await supabase.auth.signInWithPassword({ email, password: ADMIN_AUTH_PASSWORD });
-        if (!signInResponse.error && signInResponse.data.session) {
-          authSession = signInResponse.data.session;
-        } else {
-          const signupResponse = await supabase.auth.signUp({ email, password: ADMIN_AUTH_PASSWORD });
-          if (!signupResponse.error && signupResponse.data.session) {
-            authSession = signupResponse.data.session;
-          } else {
-            const retryResponse = await supabase.auth.signInWithPassword({ email, password: ADMIN_AUTH_PASSWORD });
-            if (!retryResponse.error) authSession = retryResponse.data.session;
-          }
-        }
-      } else {
-        const signInResponse = await supabase.auth.signInWithPassword({ email, password });
-        if (!signInResponse.error) authSession = signInResponse.data.session;
-      }
-      if (!authSession) throw new Error('login');
-      await loadSessionData(authSession);
+      const email = loginRole === 'admin' ? identifier.trim().toLowerCase() : accountEmailFromIdentifier(identifier);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error || !data.session) throw new Error('login');
+      await loadSessionData(data.session);
     } catch {
-      setAuthError(loginRole === 'admin' ? 'Nome de acesso ou senha incorretos.' : 'Telefone ou senha incorretos.');
+      setAuthError(loginRole === 'admin' ? 'E-mail ou senha incorretos.' : 'Telefone, nome ou senha incorretos.');
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function handleSignup(values: SignupValues) {
+  async function handleSignup(values: FormData) {
     setIsLoading(true);
     setAuthError('');
     setNotice('');
     try {
-      const email = values.phone.trim() ? accountEmailFromPhone(values.phone) : accountEmailFromName(values.fullName);
-      const signupResponse = await supabase.auth.signUp({ email, password: values.password });
-      if (signupResponse.error || !signupResponse.data.user || !signupResponse.data.session) throw new Error('signup');
-      const { data: createdStudent, error: studentError } = await supabase.from('students').insert({
-        full_name: values.fullName,
-        birth_date: values.birthDate,
-        address: values.address,
-        phone: values.phone.trim() || null,
-        emergency_contact_name: values.emergencyContactName,
-        emergency_contact_phone: values.emergencyContactPhone,
-        comorbidities: values.comorbidities,
-      }).select('*').maybeSingle();
-      if (studentError || !createdStudent) throw new Error('profile');
-      if (values.avatar) {
-        const extension = values.avatar.name.split('.').pop()?.toLowerCase() || 'jpg';
-        const path = `avatars/${signupResponse.data.user.id}/profile-${Date.now()}.${extension}`;
-        const uploadResponse = await supabase.storage.from(FILE_BUCKET).upload(path, values.avatar, { upsert: true, contentType: values.avatar.type });
-        if (!uploadResponse.error) {
-          await supabase.from('students').update({ avatar_path: path }).eq('id', createdStudent.id);
-          (createdStudent as Student).avatar_path = path;
-        }
-      }
-      await loadSessionData(signupResponse.data.session);
-    } catch {
-      await supabase.auth.signOut();
-      setAuthError('Não foi possível concluir o cadastro. Verifique os dados e tente novamente.');
+      await registerAccount('self', values);
+      const phone = String(values.get('phone') ?? '').trim();
+      const name = String(values.get('fullName') ?? '');
+      await handleLogin('student', phone || name, String(values.get('password') ?? ''));
+      setNotice('Cadastro concluído. Se necessário, entre com os dados que acabou de cadastrar.');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : genericError);
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function handleAdminSignup(values: FormData) {
+    await registerAccount('student', values);
+    await loadAdminData();
   }
 
   async function handleSignOut() {
@@ -225,6 +192,40 @@ function App() {
     await loadStudentData(student);
   }
 
+  async function handleEditOwnProfile(fields: FormData) {
+    if (!student) throw new Error('Entre novamente para editar a ficha.');
+    const text = (name: string) => String(fields.get(name) ?? '').trim();
+    const values = {
+      full_name: text('fullName'),
+      birth_date: text('birthDate'),
+      address: text('address'),
+      phone: text('phone') || null,
+      emergency_contact_name: text('emergencyContactName'),
+      emergency_contact_phone: text('emergencyContactPhone'),
+      comorbidities: text('comorbidities'),
+    };
+    if (!values.full_name || !values.birth_date || !values.address || !values.emergency_contact_name || !values.emergency_contact_phone) {
+      throw new Error('Preencha os campos obrigatórios.');
+    }
+    const { data, error } = await supabase.from('students').update(values).eq('id', student.id).select('*').single();
+    if (error) throw new Error('Não foi possível salvar os dados da ficha.');
+    setStudent(data as Student);
+  }
+
+  async function handleOwnCertificate(fields: FormData) {
+    const result = await registerAccount('own_certificate', fields);
+    if (!result?.student) throw new Error('Não foi possível confirmar o envio.');
+    setStudent(result.student);
+  }
+
+  async function handleOwnAvatar(fields: FormData) {
+    const result = await registerAccount('own_avatar', fields);
+    if (!result?.student) throw new Error('Não foi possível confirmar o envio.');
+    setStudent(result.student);
+    const { data } = await supabase.storage.from(FILE_BUCKET).createSignedUrl(result.student.avatar_path!, 3600);
+    setAvatarUrl(data?.signedUrl ?? null);
+  }
+
   async function handleUpdateStudent(studentId: string, values: Partial<Student>) {
     const { error } = await supabase.from('students').update(values).eq('id', studentId);
     if (error) throw new Error('student');
@@ -237,9 +238,16 @@ function App() {
     await loadAdminData();
   }
 
-  async function handleCreateSchedule(values: { studentId: string; title: string; description: string; date: string; startTime: string; endTime: string; location: string }) {
-    const { error } = await supabase.from('workout_schedules').insert({ student_id: values.studentId, title: values.title, description: values.description, scheduled_date: values.date, start_time: values.startTime, end_time: values.endTime || null, location: values.location });
+  async function handleCreateSchedule(values: { studentId: string; title: string; description: string; date: string; startTime: string; endTime: string; location: string; workoutPlan: string }) {
+    const { error } = await supabase.from('workout_schedules').insert({ student_id: values.studentId, title: values.title, description: values.description, workout_plan: values.workoutPlan.trim() || null, scheduled_date: values.date, start_time: values.startTime, end_time: values.endTime || null, location: values.location });
     if (error) throw new Error('schedule');
+    await loadAdminData();
+  }
+
+  async function handleUpdateWorkoutPlan(scheduleId: string, plan: string) {
+    const { error } = await supabase.from('workout_schedules').update({ workout_plan: plan.trim() || null })
+      .eq('id', scheduleId).select('id').single();
+    if (error) throw new Error('Não foi possível salvar a ficha de treino.');
     await loadAdminData();
   }
 
@@ -281,9 +289,9 @@ function App() {
 
   if (isBooting) return <div className="loading-screen"><div className="loading-mark"><img src="/image.png" alt="Logo GPATF" /></div><div className="loading-line" /><p>Preparando seu espaço GPATF...</p></div>;
   if (!session || !role) return <AuthScreen onLogin={handleLogin} onSignup={handleSignup} isLoading={isLoading} error={authError} notice={notice} />;
-  if (role === 'admin') return <AdminDashboard students={students} schedules={schedules} attendance={attendance} justifications={justifications} announcements={announcements} onUpdateStudent={handleUpdateStudent} onSetStudentStatus={handleSetStudentStatus} onCreateSchedule={handleCreateSchedule} onDeleteSchedule={handleDeleteSchedule} onSetAttendance={handleSetAttendance} onReviewJustification={handleReviewJustification} onCreateAnnouncement={handleCreateAnnouncement} onToggleAnnouncement={handleToggleAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onSignOut={handleSignOut} />;
+  if (role === 'admin') return <AdminDashboard onRefreshStudents={loadAdminData} onRegisterStudent={handleAdminSignup} onRegisterCollaborator={session.user.app_metadata.gpatf_role === 'master' ? async (values) => { await registerAccount('collaborator', values); } : undefined} students={students} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} onUpdateStudent={handleUpdateStudent} onSetStudentStatus={handleSetStudentStatus} onCreateSchedule={handleCreateSchedule} onUpdateWorkoutPlan={handleUpdateWorkoutPlan} onDeleteSchedule={handleDeleteSchedule} onSetAttendance={handleSetAttendance} onReviewJustification={handleReviewJustification} onCreateAnnouncement={handleCreateAnnouncement} onToggleAnnouncement={handleToggleAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onSignOut={handleSignOut} />;
   if (!student) return <div className="loading-screen"><p>Carregando sua ficha...</p></div>;
-  return <StudentDashboard student={student} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} avatarUrl={avatarUrl} onConfirmPresence={handleConfirmPresence} onSubmitJustification={handleSubmitJustification} onSignOut={handleSignOut} />;
+  return <StudentDashboard student={student} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} avatarUrl={avatarUrl} onEditProfile={handleEditOwnProfile} onUploadCertificate={handleOwnCertificate} onUploadAvatar={handleOwnAvatar} onConfirmPresence={handleConfirmPresence} onSubmitJustification={handleSubmitJustification} onSignOut={handleSignOut} />;
 }
 
 export default App;

@@ -1,0 +1,6 @@
+project_id = "gpatf-project"
+
+# Public self-registration and authenticated staff creation share this endpoint.
+# Staff requests are authenticated and authorized inside the function.
+[functions.register-account]
+verify_jwt = false
