@@ -330,3 +330,25 @@ input, textarea, select { color: var(--ink); }
   .topbar { gap: 4px; }
   .topbar-signout { padding: 0 7px; }
 }
+
+.admin-header-actions { display: flex; align-items: center; gap: 8px; }
+.admin-header-actions button { min-height: 44px; }
+.profile-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.profile-edit-grid h2, .attendance-card h2 { font-size: 1rem; color: var(--ink); }
+.profile-edit-form { margin-top: 16px; }
+.profile-edit-form input[type="file"] { max-width: 100%; }
+.workout-plan { margin-top: 8px; color: var(--blue); }
+.workout-plan summary { width: fit-content; padding: 8px 0; cursor: pointer; font-weight: 700; }
+.workout-plan p { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+.attendance-period { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 16px 0; }
+.attendance-day { flex: 1 0 min(100%, 300px); display: flex; gap: 10px; align-items: center; justify-content: space-between; text-align: center; }
+.attendance-day button { flex: 0 0 44px; min-height: 44px; padding: 0; justify-content: center; }
+.attendance-empty { margin-top: 12px; color: #637889; }
+.attendance-card + .attendance-card { margin-top: 14px; }
+@media (max-width: 780px) {
+  .admin-shell .topbar { flex-wrap: wrap; padding: 8px 0; }
+  .admin-header-actions { flex: 1 0 100%; order: 1; flex-wrap: wrap; }
+  .admin-header-actions button { flex: 1 1 auto; justify-content: center; }
+  .profile-edit-grid { grid-template-columns: 1fr; }
+  .attendance-buttons button { min-height: 44px; font-size: 0.75rem; }
+}

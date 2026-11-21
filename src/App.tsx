@@ -109,20 +109,22 @@ function App() {
   }
 
   async function loadAdminData() {
-    const [studentsResponse, scheduleResponse, attendanceResponse, justificationResponse, announcementResponse] = await Promise.all([
+    const [studentsResponse, scheduleResponse, attendanceResponse, confirmationResponse, justificationResponse, announcementResponse] = await Promise.all([
       supabase.from('students').select('*').order('full_name', { ascending: true }),
       supabase.from('workout_schedules').select('*').order('scheduled_date', { ascending: true }),
       supabase.from('attendance').select('*').order('attendance_date', { ascending: false }),
+      supabase.from('attendance_confirmations').select('*').order('attendance_date', { ascending: false }),
       supabase.from('absence_justifications').select('*').order('created_at', { ascending: false }),
       supabase.from('announcements').select('*').order('created_at', { ascending: false }),
     ]);
-    if (studentsResponse.error || scheduleResponse.error || attendanceResponse.error || justificationResponse.error || announcementResponse.error) {
+    if (studentsResponse.error || scheduleResponse.error || attendanceResponse.error || confirmationResponse.error || justificationResponse.error || announcementResponse.error) {
       setAuthError(genericError);
       return;
     }
     setStudents((studentsResponse.data ?? []) as Student[]);
     setSchedules((scheduleResponse.data ?? []) as WorkoutSchedule[]);
     setAttendance((attendanceResponse.data ?? []) as Attendance[]);
+    setConfirmations((confirmationResponse.data ?? []) as AttendanceConfirmation[]);
     setJustifications((justificationResponse.data ?? []) as AbsenceJustification[]);
     setAnnouncements((announcementResponse.data ?? []) as Announcement[]);
   }
@@ -190,6 +192,40 @@ function App() {
     await loadStudentData(student);
   }
 
+  async function handleEditOwnProfile(fields: FormData) {
+    if (!student) throw new Error('Entre novamente para editar a ficha.');
+    const text = (name: string) => String(fields.get(name) ?? '').trim();
+    const values = {
+      full_name: text('fullName'),
+      birth_date: text('birthDate'),
+      address: text('address'),
+      phone: text('phone') || null,
+      emergency_contact_name: text('emergencyContactName'),
+      emergency_contact_phone: text('emergencyContactPhone'),
+      comorbidities: text('comorbidities'),
+    };
+    if (!values.full_name || !values.birth_date || !values.address || !values.emergency_contact_name || !values.emergency_contact_phone) {
+      throw new Error('Preencha os campos obrigatórios.');
+    }
+    const { data, error } = await supabase.from('students').update(values).eq('id', student.id).select('*').single();
+    if (error) throw new Error('Não foi possível salvar os dados da ficha.');
+    setStudent(data as Student);
+  }
+
+  async function handleOwnCertificate(fields: FormData) {
+    const result = await registerAccount('own_certificate', fields);
+    if (!result?.student) throw new Error('Não foi possível confirmar o envio.');
+    setStudent(result.student);
+  }
+
+  async function handleOwnAvatar(fields: FormData) {
+    const result = await registerAccount('own_avatar', fields);
+    if (!result?.student) throw new Error('Não foi possível confirmar o envio.');
+    setStudent(result.student);
+    const { data } = await supabase.storage.from(FILE_BUCKET).createSignedUrl(result.student.avatar_path!, 3600);
+    setAvatarUrl(data?.signedUrl ?? null);
+  }
+
   async function handleUpdateStudent(studentId: string, values: Partial<Student>) {
     const { error } = await supabase.from('students').update(values).eq('id', studentId);
     if (error) throw new Error('student');
@@ -202,9 +238,16 @@ function App() {
     await loadAdminData();
   }
 
-  async function handleCreateSchedule(values: { studentId: string; title: string; description: string; date: string; startTime: string; endTime: string; location: string }) {
-    const { error } = await supabase.from('workout_schedules').insert({ student_id: values.studentId, title: values.title, description: values.description, scheduled_date: values.date, start_time: values.startTime, end_time: values.endTime || null, location: values.location });
+  async function handleCreateSchedule(values: { studentId: string; title: string; description: string; date: string; startTime: string; endTime: string; location: string; workoutPlan: string }) {
+    const { error } = await supabase.from('workout_schedules').insert({ student_id: values.studentId, title: values.title, description: values.description, workout_plan: values.workoutPlan.trim() || null, scheduled_date: values.date, start_time: values.startTime, end_time: values.endTime || null, location: values.location });
     if (error) throw new Error('schedule');
+    await loadAdminData();
+  }
+
+  async function handleUpdateWorkoutPlan(scheduleId: string, plan: string) {
+    const { error } = await supabase.from('workout_schedules').update({ workout_plan: plan.trim() || null })
+      .eq('id', scheduleId).select('id').single();
+    if (error) throw new Error('Não foi possível salvar a ficha de treino.');
     await loadAdminData();
   }
 
@@ -246,9 +289,9 @@ function App() {
 
   if (isBooting) return <div className="loading-screen"><div className="loading-mark"><img src="/image.png" alt="Logo GPATF" /></div><div className="loading-line" /><p>Preparando seu espaço GPATF...</p></div>;
   if (!session || !role) return <AuthScreen onLogin={handleLogin} onSignup={handleSignup} isLoading={isLoading} error={authError} notice={notice} />;
-  if (role === 'admin') return <AdminDashboard onRefreshStudents={loadAdminData} onRegisterStudent={handleAdminSignup} onRegisterCollaborator={session.user.app_metadata.gpatf_role === 'master' ? async (values) => { await registerAccount('collaborator', values); } : undefined} students={students} schedules={schedules} attendance={attendance} justifications={justifications} announcements={announcements} onUpdateStudent={handleUpdateStudent} onSetStudentStatus={handleSetStudentStatus} onCreateSchedule={handleCreateSchedule} onDeleteSchedule={handleDeleteSchedule} onSetAttendance={handleSetAttendance} onReviewJustification={handleReviewJustification} onCreateAnnouncement={handleCreateAnnouncement} onToggleAnnouncement={handleToggleAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onSignOut={handleSignOut} />;
+  if (role === 'admin') return <AdminDashboard onRefreshStudents={loadAdminData} onRegisterStudent={handleAdminSignup} onRegisterCollaborator={session.user.app_metadata.gpatf_role === 'master' ? async (values) => { await registerAccount('collaborator', values); } : undefined} students={students} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} onUpdateStudent={handleUpdateStudent} onSetStudentStatus={handleSetStudentStatus} onCreateSchedule={handleCreateSchedule} onUpdateWorkoutPlan={handleUpdateWorkoutPlan} onDeleteSchedule={handleDeleteSchedule} onSetAttendance={handleSetAttendance} onReviewJustification={handleReviewJustification} onCreateAnnouncement={handleCreateAnnouncement} onToggleAnnouncement={handleToggleAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onSignOut={handleSignOut} />;
   if (!student) return <div className="loading-screen"><p>Carregando sua ficha...</p></div>;
-  return <StudentDashboard student={student} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} avatarUrl={avatarUrl} onConfirmPresence={handleConfirmPresence} onSubmitJustification={handleSubmitJustification} onSignOut={handleSignOut} />;
+  return <StudentDashboard student={student} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} avatarUrl={avatarUrl} onEditProfile={handleEditOwnProfile} onUploadCertificate={handleOwnCertificate} onUploadAvatar={handleOwnAvatar} onConfirmPresence={handleConfirmPresence} onSubmitJustification={handleSubmitJustification} onSignOut={handleSignOut} />;
 }
 
 export default App;

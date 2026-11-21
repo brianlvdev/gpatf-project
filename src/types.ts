@@ -28,6 +28,7 @@ export interface WorkoutSchedule {
   student_id: string;
   title: string;
   description: string;
+  workout_plan: string | null;
   scheduled_date: string;
   start_time: string;
   end_time: string | null;

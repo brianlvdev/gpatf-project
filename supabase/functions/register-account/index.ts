@@ -53,21 +53,25 @@ Deno.serve(async (request) => {
   }
   const field = (name: string) => String(form.get(name) ?? '').trim();
   const action = field('action');
-  if (!['self', 'student', 'collaborator', 'certificate'].includes(action)) return reply(400, 'Cadastro inválido.');
+  if (!['self', 'student', 'collaborator', 'certificate', 'own_certificate', 'own_avatar'].includes(action)) return reply(400, 'Cadastro inválido.');
 
+  const ownUpload = action === 'own_certificate' || action === 'own_avatar';
+  let callerId: string | null = null;
   if (action !== 'self') {
     const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];
     if (!token) return reply(401, 'Entre novamente para continuar.');
     const { data, error } = await service.auth.getUser(token);
     if (error || !data.user) return reply(401, 'Entre novamente para continuar.');
     const role = data.user.app_metadata.gpatf_role;
-    if (role !== 'master' && (role !== 'admin' || action === 'collaborator')) {
+    callerId = data.user.id;
+    if (!ownUpload && role !== 'master' && (role !== 'admin' || action === 'collaborator')) {
       return reply(403, 'Sua conta não tem permissão para este cadastro.');
     }
   }
 
-  if (action === 'certificate') {
-    return await updateCertificate(field('studentId'), field('issuedOn'), form.get('certificate'));
+  if (action === 'certificate' || ownUpload) {
+    const kind = action === 'own_avatar' ? 'avatar' : 'certificate';
+    return await updateStudentImage(kind, ownUpload ? null : field('studentId'), ownUpload ? callerId : null, field('issuedOn'), form.get(kind));
   }
 
   const password = String(form.get('password') ?? '');
@@ -169,9 +173,18 @@ Deno.serve(async (request) => {
   }
 });
 
-async function updateCertificate(studentId: string, issuedOn: string, value: FormDataEntryValue | null) {
-  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(studentId) ||
-      !readDate(issuedOn) || issuedOn > todayInSantaMaria()) {
+async function updateStudentImage(
+  kind: 'avatar' | 'certificate',
+  studentId: string | null,
+  ownerId: string | null,
+  issuedOn: string,
+  value: FormDataEntryValue | null,
+) {
+  const isCertificate = kind === 'certificate';
+  if (!ownerId && !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(studentId ?? '')) {
+    return reply(400, 'Selecione uma ficha válida.');
+  }
+  if (isCertificate && (!readDate(issuedOn) || issuedOn > todayInSantaMaria())) {
     return reply(400, 'Informe uma data de emissão válida.');
   }
 
@@ -181,47 +194,49 @@ async function updateCertificate(studentId: string, issuedOn: string, value: For
   } catch {
     return reply(400, 'Envie uma foto JPG ou PNG com até 5 MB.');
   }
-  if (!image) return reply(400, 'Anexe a foto do atestado.');
+  if (!image) return reply(400, 'Selecione uma foto.');
 
-  const { data: student, error } = await service.from('students')
-    .select('auth_id, medical_certificate_path').eq('id', studentId).maybeSingle();
+  const lookup = service.from('students').select('id, auth_id, status, avatar_path, medical_certificate_path');
+  const { data: student, error } = await (ownerId ? lookup.eq('auth_id', ownerId) : lookup.eq('id', studentId)).maybeSingle();
   if (error) return reply(500, 'Não foi possível consultar a ficha.');
-  if (!student) return reply(404, 'Ficha do aluno não encontrada.');
+  if (!student || (ownerId && student.status !== 'active')) return reply(404, 'Ficha do aluno não disponível.');
 
-  const path = `${student.auth_id}/atestado-${crypto.randomUUID()}.${image.extension}`;
-  const bucket = service.storage.from(certificateBucket);
+  const filename = `${crypto.randomUUID()}.${image.extension}`;
+  const path = isCertificate ? `${student.auth_id}/atestado-${filename}` : `avatars/${student.auth_id}/perfil-${filename}`;
+  const bucket = service.storage.from(isCertificate ? certificateBucket : avatarBucket);
   const upload = await bucket.upload(path, image.file, { contentType: image.type });
-  if (upload.error) return reply(500, 'Não foi possível enviar a foto do atestado.');
+  if (upload.error) return reply(500, 'Não foi possível enviar a foto.');
 
-  const previousPath = student.medical_certificate_path;
-  const update = service.from('students').update({
-    medical_certificate_path: path,
-    medical_certificate_issued_on: issuedOn,
-    updated_at: new Date().toISOString(),
-  }).eq('id', studentId);
-  const guarded = previousPath
-    ? update.eq('medical_certificate_path', previousPath)
-    : update.is('medical_certificate_path', null);
+  const column = isCertificate ? 'medical_certificate_path' : 'avatar_path';
+  const previousPath = student[column];
+  const fields = isCertificate
+    ? { medical_certificate_path: path, medical_certificate_issued_on: issuedOn }
+    : { avatar_path: path };
+  let update = service.from('students').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', student.id);
+  if (ownerId) update = update.eq('status', 'active');
+  const guarded = previousPath ? update.eq(column, previousPath) : update.is(column, null);
   const result = await guarded.select('*').maybeSingle();
   let saved = result.data;
   if (result.error) {
-    const check = await service.from('students').select('*').eq('id', studentId).maybeSingle();
+    const check = await service.from('students').select('*').eq('id', student.id).maybeSingle();
     if (check.error) {
-      console.error('Could not verify replacement certificate', studentId);
-      return reply(500, 'Não foi possível confirmar o atestado. Reabra a ficha antes de tentar novamente.');
+      console.error('Could not verify replacement image', student.id);
+      return reply(500, 'Não foi possível confirmar o envio. Reabra a ficha antes de tentar novamente.');
     }
-    if (check.data?.medical_certificate_path === path) saved = check.data;
+    if (check.data?.[column] === path) saved = check.data;
   }
   if (!saved) {
     const cleanup = await bucket.remove([path]);
-    if (cleanup.error) console.error('Could not remove unused certificate', studentId);
+    if (cleanup.error) console.error('Could not remove unused image', student.id);
     return result.error
-      ? reply(500, 'Não foi possível salvar o atestado.')
+      ? reply(500, 'Não foi possível salvar a foto.')
       : reply(409, 'A ficha foi alterada. Recarregue e tente novamente.');
   }
-  if (previousPath) {
+  // The old avatar path can be edited through legacy column grants. Verify ownership before removing it.
+  const ownDirectory = isCertificate ? `${student.auth_id}/` : `avatars/${student.auth_id}/`;
+  if (previousPath?.startsWith(ownDirectory) && !previousPath.slice(ownDirectory.length).includes('/')) {
     const cleanup = await bucket.remove([previousPath]);
-    if (cleanup.error) console.error('Could not remove replaced certificate', studentId);
+    if (cleanup.error) console.error('Could not remove replaced image', student.id);
   }
   return Response.json({ student: saved }, { headers });
 }

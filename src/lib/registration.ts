@@ -17,7 +17,7 @@ export function certificateStatus(expiresOn: string | null, today = todayInSanta
   return `Válido até ${formatted} · ${days === 1 ? 'Falta 1 dia' : `Faltam ${days} dias`}`;
 }
 
-export async function registerAccount(action: 'self' | 'student' | 'collaborator' | 'certificate', fields: FormData) {
+export async function registerAccount(action: 'self' | 'student' | 'collaborator' | 'certificate' | 'own_certificate' | 'own_avatar', fields: FormData) {
   fields.set('action', action);
   const { data, error } = await supabase.functions.invoke<{ student?: Student }>('register-account', { body: fields });
   if (error instanceof FunctionsHttpError) {
