@@ -66,7 +66,7 @@ function App() {
   async function loadSessionData(nextSession: Session) {
     setSession(nextSession);
     if (nextSession.user.email === ADMIN_EMAIL) {
-      setRole('students');
+      setRole('admin');
       await loadAdminData();
       return;
     }
