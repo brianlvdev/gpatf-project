@@ -35,7 +35,7 @@ function App() {
       }
       if (mounted) setIsBooting(false);
     }).catch(() => {
-      if (mounted) setIsBooting(false);
+      if (mounted) { setAuthError(genericError); setIsBooting(false); }
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event) => {
@@ -70,7 +70,7 @@ function App() {
     const { data: currentStudent, error } = await supabase.from('students').select('*').eq('auth_id', nextSession.user.id).maybeSingle();
     if (error || !currentStudent) {
       await supabase.auth.signOut();
-      setAuthError(genericError);
+      setAuthError('Sua ficha não está disponível. Procure a equipe GPATF para verificar o cadastro.');
       return;
     }
     if (currentStudent.status === 'blocked' || currentStudent.status === 'inactive') {
@@ -168,7 +168,14 @@ function App() {
   }
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) throw error;
+      setAuthError('');
+      setNotice('');
+    } catch {
+      setAuthError('Não foi possível sair. Verifique sua conexão e tente novamente.');
+    }
   }
 
   async function handleConfirmPresence(schedule: WorkoutSchedule) {
@@ -289,6 +296,7 @@ function App() {
 
   if (isBooting) return <div className="loading-screen"><div className="loading-mark"><img src="/image.png" alt="Logo GPATF" /></div><div className="loading-line" /><p>Preparando seu espaço GPATF...</p></div>;
   if (!session || !role) return <AuthScreen onLogin={handleLogin} onSignup={handleSignup} isLoading={isLoading} error={authError} notice={notice} />;
+  if (authError) return <div className="loading-screen" role="alert"><p>{authError}</p><button className="primary-button" onClick={() => { setAuthError(''); window.location.reload(); }}>Tentar novamente</button><button className="outline-button" onClick={handleSignOut}>Sair</button></div>;
   if (role === 'admin') return <AdminDashboard onRefreshStudents={loadAdminData} onRegisterStudent={handleAdminSignup} onRegisterCollaborator={session.user.app_metadata.gpatf_role === 'master' ? async (values) => { await registerAccount('collaborator', values); } : undefined} students={students} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} onUpdateStudent={handleUpdateStudent} onSetStudentStatus={handleSetStudentStatus} onCreateSchedule={handleCreateSchedule} onUpdateWorkoutPlan={handleUpdateWorkoutPlan} onDeleteSchedule={handleDeleteSchedule} onSetAttendance={handleSetAttendance} onReviewJustification={handleReviewJustification} onCreateAnnouncement={handleCreateAnnouncement} onToggleAnnouncement={handleToggleAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onSignOut={handleSignOut} />;
   if (!student) return <div className="loading-screen"><p>Carregando sua ficha...</p></div>;
   return <StudentDashboard student={student} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} avatarUrl={avatarUrl} onEditProfile={handleEditOwnProfile} onUploadCertificate={handleOwnCertificate} onUploadAvatar={handleOwnAvatar} onConfirmPresence={handleConfirmPresence} onSubmitJustification={handleSubmitJustification} onSignOut={handleSignOut} />;

@@ -352,3 +352,11 @@ input, textarea, select { color: var(--ink); }
   .profile-edit-grid { grid-template-columns: 1fr; }
   .attendance-buttons button { min-height: 44px; font-size: 0.75rem; }
 }
+
+/* Keep logout reachable on short screens and mobile browser viewports. */
+.sidebar { overflow-y: auto; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+.sidebar > * { flex-shrink: 0; }
+.logout-button { width: 100%; min-height: 48px; color: var(--danger); }
+.logout-button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.session-error { position: fixed; z-index: 100; bottom: 20px; right: 20px; max-width: min(420px, calc(100vw - 40px)); padding: 16px; border: 1px solid #b42318; border-radius: 10px; background: #fff; color: #b42318; }
+.session-error button { margin-left: 12px; }

@@ -3,7 +3,7 @@ import { Bell, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, FileText
 import { AbsenceJustification, Announcement, Attendance, AttendanceConfirmation, Student, WorkoutSchedule } from '@/types';
 
 import StudentProfileEditor from '@/components/StudentProfileEditor';
-import { certificateStatus } from '@/lib/registration';
+import { certificateStatus, todayInSantaMaria } from '@/lib/registration';
 
 interface StudentDashboardProps {
   student: Student;
@@ -33,7 +33,7 @@ export default function StudentDashboard({ student, schedules, attendance, confi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
-  const nextSchedule = schedules.find((schedule) => schedule.status !== 'cancelled' && schedule.scheduled_date >= new Date().toISOString().slice(0, 10));
+  const nextSchedule = schedules.find((schedule) => schedule.status === 'scheduled' && schedule.scheduled_date >= todayInSantaMaria());
   const presentCount = attendance.filter((item) => item.status === 'present').length;
   const confirmedDates = useMemo(() => new Set(confirmations.map((item) => item.attendance_date)), [confirmations]);
 
@@ -70,11 +70,12 @@ export default function StudentDashboard({ student, schedules, attendance, confi
           <button className={activeView === 'absence' ? 'active' : ''} onClick={() => navigate('absence')}><FileText size={20} /> Justificar falta</button>
         </nav>
         <div className="sidebar-help"><ShieldCheck size={20} /><div><strong>Precisou de ajuda?</strong><p>Fale com a equipe na academia.</p></div></div>
+        <button type="button" className="logout-button" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
       </aside>
       {menuOpen && <button className="sidebar-overlay" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
 
       <main className="main-content">
-        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Área do aluno</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'agenda' ? 'Minha agenda' : activeView === 'absence' ? 'Justificar falta' : 'Minha ficha'}</strong></div><div className="topbar-user"><div className="avatar avatar-small">{avatarUrl ? <img src={avatarUrl} alt="Foto de perfil" /> : <UserRound size={17} />}</div><span>{student.full_name.split(' ')[0]}</span><button type="button" className="topbar-signout" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button></div></header>
+        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Área do aluno</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'agenda' ? 'Minha agenda' : activeView === 'absence' ? 'Justificar falta' : 'Minha ficha'}</strong></div><div className="topbar-user"><div className="avatar avatar-small">{avatarUrl ? <img src={avatarUrl} alt="Foto de perfil" /> : <UserRound size={17} />}</div><span>{student.full_name.split(' ')[0]}</span></div></header>
 
         {activeView === 'overview' && <>
           <section className="welcome-row"><div><p className="eyebrow">Bom te ver por aqui</p><h1>Olá, {student.full_name.split(' ')[0]}.</h1><p className="section-lede">Seu cuidado começa com um passo de cada vez.</p></div><div className="welcome-date"><CalendarDays size={18} /><span>{new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</span></div></section>

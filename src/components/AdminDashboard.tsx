@@ -47,7 +47,7 @@ export default function AdminDashboard({ onRefreshStudents, onRegisterStudent, o
   const [feedback, setFeedback] = useState('');
 
   const activeStudents = students.filter((student) => student.status === 'active');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInSantaMaria();
   const todaysSchedules = schedules.filter((schedule) => schedule.scheduled_date === today && schedule.status !== 'cancelled');
   const pendingJustifications = justifications.filter((item) => item.status === 'pending');
   const filteredStudents = students.filter((student) => student.full_name.toLowerCase().includes(search.toLowerCase()) || (student.phone ?? '').includes(search));
@@ -87,13 +87,14 @@ export default function AdminDashboard({ onRefreshStudents, onRegisterStudent, o
           <button className={activeView === 'announcements' ? 'active' : ''} onClick={() => navigate('announcements')}><Bell size={20} /> Avisos</button>
         </nav>
         <div className="admin-side-status"><div className="status-pulse" /><div><strong>Painel ativo</strong><span>Dados atualizados</span></div></div>
+        <button type="button" className="logout-button" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
       </aside>
       {menuOpen && <button className="sidebar-overlay" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
       <main className="main-content">
         <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : 'Avisos'}</strong></div><div className="admin-header-actions">
           {onRegisterCollaborator && <button type="button" className="outline-button" onClick={() => setRegistration('collaborator')}><Plus size={18} aria-hidden="true" /> Cadastrar colaborador</button>}
           <button type="button" className="primary-button" onClick={() => setRegistration('student')}><Plus size={18} aria-hidden="true" /> Cadastrar aluno</button>
-        </div><div className="topbar-user"><div className="avatar avatar-small admin-avatar"><ShieldCheck size={17} /></div><span>Equipe GPATF</span><button type="button" className="topbar-signout" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button></div></header>
+        </div><div className="topbar-user"><div className="avatar avatar-small admin-avatar"><ShieldCheck size={17} /></div><span>Equipe GPATF</span></div></header>
         {feedback && <div className="toast"><CheckCircle2 size={18} /> {feedback}</div>}
 
         {activeView === 'overview' && <AdminOverview students={students} todaysSchedules={todaysSchedules} pendingJustifications={pendingJustifications} announcements={announcements} onNavigate={navigate} onReviewJustification={onReviewJustification} onCreateAnnouncement={onCreateAnnouncement} />}
