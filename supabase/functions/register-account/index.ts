@@ -81,11 +81,14 @@ Deno.serve(async (request) => {
   }
   if (action === 'collaborator') {
     const email = field('email').toLowerCase();
+    // Keep older clients working while the frontend release rolls out.
+    const fullName = field('fullName') || email.split('@')[0];
+    if (fullName.length > 180) return reply(400, 'Informe o nome completo do colaborador.');
     if (!/^[^\s@]+@acad\.ufsm\.br$/.test(email) || email.length > 254) {
       return reply(400, 'Use o e-mail acadêmico da UFSM (@acad.ufsm.br).');
     }
     const { error } = await service.auth.admin.createUser({
-      email, password, email_confirm: true, app_metadata: { gpatf_role: 'admin' },
+      email, password, email_confirm: true, app_metadata: { gpatf_role: 'admin', full_name: fullName },
     });
     return error ? accountError(error) : reply(201);
   }

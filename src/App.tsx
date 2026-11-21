@@ -276,8 +276,8 @@ function App() {
     await loadAdminData();
   }
 
-  async function handleCreateAnnouncement(title: string, message: string) {
-    const { error } = await supabase.from('announcements').insert({ title, message });
+  async function handleCreateAnnouncement(title: string, message: string, media?: { image_url: string | null; link_url: string | null }) {
+    const { error } = await supabase.from('announcements').insert({ title, message, ...media });
     if (error) throw new Error('announcement');
     await loadAdminData();
   }

@@ -42,6 +42,7 @@ export default function RegistrationDrawer({ kind, onClose, onSubmit }: Registra
             <StudentRegistrationFields />
             <CertificateFields />
           </> : <>
+            <label className="field-label">Nome completo<input name="fullName" required maxLength={180} autoComplete="name" /></label>
             <label className="field-label">E-mail acadêmico da UFSM
               <input name="email" type="email" required placeholder="nome@acad.ufsm.br" />
             </label>
