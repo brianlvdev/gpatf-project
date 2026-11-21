@@ -5,8 +5,6 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export const ADMIN_EMAIL = 'adm@gpatf.local';
-export const ADMIN_AUTH_PASSWORD = 'Gpatf!xR7#qM4vN2@zK8';
 export const FILE_BUCKET = 'gpatf-files';
 
 export function normalizePhone(phone: string): string {
@@ -26,5 +24,5 @@ export function accountEmailFromName(name: string): string {
 }
 
 export function accountEmailFromIdentifier(identifier: string): string {
-  return normalizePhone(identifier).length >= 8 ? accountEmailFromPhone(identifier) : accountEmailFromName(identifier);
+  return /^[\d\s()+.-]+$/.test(identifier) && normalizePhone(identifier).length >= 8 ? accountEmailFromPhone(identifier) : accountEmailFromName(identifier);
 }

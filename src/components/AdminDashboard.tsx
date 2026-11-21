@@ -2,7 +2,13 @@ import { FormEvent, useState } from 'react';
 import { Archive, Bell, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, FileText, LayoutDashboard, LogOut, Menu, Pencil, Plus, Search, ShieldCheck, Trash2, UserRound, Users, X } from 'lucide-react';
 import { AbsenceJustification, Announcement, Attendance, AttendanceStatus, Student, StudentStatus, WorkoutSchedule } from '@/types';
 
+import RegistrationDrawer from '@/components/RegistrationDrawer';
+import { certificateStatus, CERTIFICATE_BUCKET } from '@/lib/registration';
+import { supabase } from '@/lib/supabase';
+
 interface AdminDashboardProps {
+  onRegisterStudent: (fields: FormData) => Promise<void>;
+  onRegisterCollaborator?: (fields: FormData) => Promise<void>;
   students: Student[];
   schedules: WorkoutSchedule[];
   attendance: Attendance[];
@@ -25,7 +31,8 @@ type AdminView = 'overview' | 'students' | 'agenda' | 'attendance' | 'announceme
 const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)).replace('.', '');
 const formatTime = (time: string) => time.slice(0, 5);
 
-export default function AdminDashboard({ students, schedules, attendance, justifications, announcements, onUpdateStudent, onSetStudentStatus, onCreateSchedule, onDeleteSchedule, onSetAttendance, onReviewJustification, onCreateAnnouncement, onToggleAnnouncement, onDeleteAnnouncement, onSignOut }: AdminDashboardProps) {
+export default function AdminDashboard({ onRegisterStudent, onRegisterCollaborator, students, schedules, attendance, justifications, announcements, onUpdateStudent, onSetStudentStatus, onCreateSchedule, onDeleteSchedule, onSetAttendance, onReviewJustification, onCreateAnnouncement, onToggleAnnouncement, onDeleteAnnouncement, onSignOut }: AdminDashboardProps) {
+  const [registration, setRegistration] = useState<'student' | 'collaborator' | null>(null);
   const [activeView, setActiveView] = useState<AdminView>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -74,6 +81,7 @@ export default function AdminDashboard({ students, schedules, attendance, justif
           <button className={activeView === 'agenda' ? 'active' : ''} onClick={() => navigate('agenda')}><CalendarDays size={20} /> Agenda</button>
           <button className={activeView === 'attendance' ? 'active' : ''} onClick={() => navigate('attendance')}><CheckCircle2 size={20} /> Presença</button>
           <button className={activeView === 'announcements' ? 'active' : ''} onClick={() => navigate('announcements')}><Bell size={20} /> Avisos</button>
+          {onRegisterCollaborator && <button onClick={() => { setMenuOpen(false); setRegistration('collaborator'); }}><Plus size={20} /> Cadastrar colaborador</button>}
         </nav>
         <div className="admin-side-status"><div className="status-pulse" /><div><strong>Painel ativo</strong><span>Dados atualizados</span></div></div>
         <button className="logout-button" onClick={onSignOut}><LogOut size={18} /> Sair da conta</button>
@@ -84,12 +92,18 @@ export default function AdminDashboard({ students, schedules, attendance, justif
         {feedback && <div className="toast"><CheckCircle2 size={18} /> {feedback}</div>}
 
         {activeView === 'overview' && <AdminOverview students={students} todaysSchedules={todaysSchedules} pendingJustifications={pendingJustifications} announcements={announcements} onNavigate={navigate} onReviewJustification={onReviewJustification} onCreateAnnouncement={onCreateAnnouncement} />}
-        {activeView === 'students' && <section className="view-section"><div className="section-title-row"><div><p className="eyebrow">Acompanhamento individual</p><h1>Alunos</h1><p className="section-lede">Consulte fichas e mantenha os cadastros atualizados.</p></div><div className="round-icon"><Users size={24} /></div></div><div className="toolbar"><div className="search-box"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome ou telefone" /></div><span className="toolbar-count">{filteredStudents.length} cadastro{filteredStudents.length === 1 ? '' : 's'}</span></div><div className="student-admin-list">{filteredStudents.map((student) => <StudentAdminRow key={student.id} student={student} onEdit={() => setSelectedStudent(student)} onStatus={handleStatus} />)}{filteredStudents.length === 0 && <div className="empty-state large-empty"><Users size={34} /><strong>Nenhum aluno encontrado</strong><p>Tente buscar por outro nome ou telefone.</p></div>}</div></section>}
+        {activeView === 'students' && <section className="view-section"><div className="section-title-row"><div><p className="eyebrow">Acompanhamento individual</p><h1>Alunos</h1><p className="section-lede">Consulte fichas e mantenha os cadastros atualizados.</p></div><button className="primary-button" onClick={() => setRegistration('student')}><Plus size={20} /> Cadastrar aluno</button></div><div className="toolbar"><div className="search-box"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome ou telefone" /></div><span className="toolbar-count">{filteredStudents.length} cadastro{filteredStudents.length === 1 ? '' : 's'}</span></div><div className="student-admin-list">{filteredStudents.map((student) => <StudentAdminRow key={student.id} student={student} onEdit={() => setSelectedStudent(student)} onStatus={handleStatus} />)}{filteredStudents.length === 0 && <div className="empty-state large-empty"><Users size={34} /><strong>Nenhum aluno encontrado</strong><p>Tente buscar por outro nome ou telefone.</p></div>}</div></section>}
         {activeView === 'agenda' && <AgendaManager students={activeStudents} schedules={schedules} showForm={showScheduleForm} setShowForm={setShowScheduleForm} saving={saving} setSaving={setSaving} onCreate={onCreateSchedule} onDelete={onDeleteSchedule} onFeedback={showFeedback} />}
         {activeView === 'attendance' && <AttendanceManager students={activeStudents} attendance={attendance} schedules={schedules} onSetAttendance={onSetAttendance} onFeedback={showFeedback} />}
         {activeView === 'announcements' && <AnnouncementsManager announcements={announcements} showForm={showAnnouncementForm} setShowForm={setShowAnnouncementForm} onCreate={onCreateAnnouncement} onToggle={onToggleAnnouncement} onDelete={onDeleteAnnouncement} onFeedback={showFeedback} />}
       </main>
-      {selectedStudent && <StudentEditDrawer student={selectedStudent} onClose={() => setSelectedStudent(null)} onSave={async (values) => { await onUpdateStudent(selectedStudent.id, values); setSelectedStudent({ ...selectedStudent, ...values }); showFeedback('Ficha atualizada com sucesso.'); }} onStatus={(status) => handleStatus(selectedStudent, status)} saving={saving} />}
+      {registration && <RegistrationDrawer key={registration} kind={registration} onClose={() => setRegistration(null)} onSubmit={async (fields) => {
+        if (registration === 'student') await onRegisterStudent(fields);
+        else if (onRegisterCollaborator) await onRegisterCollaborator(fields);
+        setRegistration(null);
+        showFeedback(registration === 'student' ? 'Aluno cadastrado com sucesso.' : 'Colaborador cadastrado com sucesso.');
+      }} />}
+      {selectedStudent && <StudentEditDrawer key={selectedStudent.id} student={selectedStudent} onClose={() => setSelectedStudent(null)} onSave={async (values) => { await onUpdateStudent(selectedStudent.id, values); setSelectedStudent({ ...selectedStudent, ...values }); showFeedback('Ficha atualizada com sucesso.'); }} onStatus={(status) => handleStatus(selectedStudent, status)} saving={saving} />}
     </div>
   );
 }
@@ -123,10 +137,31 @@ function StudentAdminRow({ student, onEdit, onStatus }: { student: Student; onEd
 }
 
 function StudentEditDrawer({ student, onClose, onSave, onStatus, saving }: { student: Student; onClose: () => void; onSave: (values: Partial<Student>) => Promise<void>; onStatus: (status: StudentStatus) => Promise<void>; saving: boolean }) {
+  const [certificateLink, setCertificateLink] = useState('');
+  const [certificateError, setCertificateError] = useState('');
+  const [loadingCertificate, setLoadingCertificate] = useState(false);
+
+  async function loadCertificateLink() {
+    if (!student.medical_certificate_path) return;
+    setLoadingCertificate(true);
+    setCertificateError('');
+    const { data, error } = await supabase.storage.from(CERTIFICATE_BUCKET).createSignedUrl(student.medical_certificate_path, 300);
+    if (error || !data) setCertificateError('Não foi possível abrir o atestado.');
+    else setCertificateLink(data.signedUrl);
+    setLoadingCertificate(false);
+  }
+
   const [values, setValues] = useState({ full_name: student.full_name, birth_date: student.birth_date, address: student.address, phone: student.phone ?? '', emergency_contact_name: student.emergency_contact_name, emergency_contact_phone: student.emergency_contact_phone, comorbidities: student.comorbidities });
   const update = (field: keyof typeof values, value: string) => setValues((current) => ({ ...current, [field]: value }));
   const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); await onSave(values); };
-  return <><button className="drawer-backdrop" aria-label="Fechar ficha" onClick={onClose} /><aside className="edit-drawer"><div className="drawer-header"><div><p className="eyebrow">Ficha do aluno</p><h2>{student.full_name}</h2><span className={`status-badge ${student.status}`}>{student.status === 'active' ? 'Cadastro ativo' : student.status === 'blocked' ? 'Cadastro bloqueado' : 'Cadastro inativo'}</span></div><button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={21} /></button></div><form className="drawer-form" onSubmit={submit}><label className="field-label">Nome completo<input required value={values.full_name} onChange={(event) => update('full_name', event.target.value)} /></label><div className="two-columns"><label className="field-label">Nascimento<input required type="date" value={values.birth_date} onChange={(event) => update('birth_date', event.target.value)} /></label><label className="field-label">Telefone <span className="optional-label">(opcional)</span><input value={values.phone} onChange={(event) => update('phone', event.target.value)} /></label></div><label className="field-label">Endereço<input required value={values.address} onChange={(event) => update('address', event.target.value)} /></label><div className="drawer-divider" /><p className="form-section-label standalone"><ShieldCheck size={17} /> Contato de emergência</p><div className="two-columns"><label className="field-label">Nome<input required value={values.emergency_contact_name} onChange={(event) => update('emergency_contact_name', event.target.value)} /></label><label className="field-label">Telefone<input required value={values.emergency_contact_phone} onChange={(event) => update('emergency_contact_phone', event.target.value)} /></label></div><label className="field-label">Cuidados importantes<textarea rows={4} value={values.comorbidities} onChange={(event) => update('comorbidities', event.target.value)} /></label><button className="primary-button button-large" disabled={saving} type="submit">{saving ? 'Salvando...' : 'Salvar alterações'} <Check size={18} /></button></form><div className="drawer-footer"><p>Controle do cadastro</p><div className="status-controls"><button disabled={saving || student.status === 'active'} onClick={() => onStatus('active')}><Check size={16} /> Ativar</button><button disabled={saving || student.status === 'blocked'} onClick={() => onStatus('blocked')}><Archive size={16} /> Bloquear</button><button disabled={saving || student.status === 'inactive'} onClick={() => onStatus('inactive')}><X size={16} /> Inativar</button></div></div></aside></>;
+  return <><button className="drawer-backdrop" aria-label="Fechar ficha" onClick={onClose} /><aside className="edit-drawer"><div className="drawer-header"><div><p className="eyebrow">Ficha do aluno</p><h2>{student.full_name}</h2><span className={`status-badge ${student.status}`}>{student.status === 'active' ? 'Cadastro ativo' : student.status === 'blocked' ? 'Cadastro bloqueado' : 'Cadastro inativo'}</span></div><button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={21} /></button></div><form className="drawer-form" onSubmit={submit}><label className="field-label">Nome completo<input required value={values.full_name} onChange={(event) => update('full_name', event.target.value)} /></label><div className="two-columns"><label className="field-label">Nascimento<input required type="date" value={values.birth_date} onChange={(event) => update('birth_date', event.target.value)} /></label><label className="field-label">Telefone <span className="optional-label">(opcional)</span><input value={values.phone} onChange={(event) => update('phone', event.target.value)} /></label></div><label className="field-label">Endereço<input required value={values.address} onChange={(event) => update('address', event.target.value)} /></label><div className="drawer-divider" /><p className="form-section-label standalone"><ShieldCheck size={17} /> Contato de emergência</p><div className="two-columns"><label className="field-label">Nome<input required value={values.emergency_contact_name} onChange={(event) => update('emergency_contact_name', event.target.value)} /></label><label className="field-label">Telefone<input required value={values.emergency_contact_phone} onChange={(event) => update('emergency_contact_phone', event.target.value)} /></label></div><label className="field-label">Cuidados importantes<textarea rows={4} value={values.comorbidities} onChange={(event) => update('comorbidities', event.target.value)} /></label><button className="primary-button button-large" disabled={saving} type="submit">{saving ? 'Salvando...' : 'Salvar alterações'} <Check size={18} /></button></form><div className="drawer-footer"><p>Atestado para atividade física</p>
+    <p>{certificateStatus(student.medical_certificate_expires_on)}</p>
+    {student.medical_certificate_path && <div className="status-controls">
+      <button type="button" disabled={loadingCertificate} onClick={loadCertificateLink}>{loadingCertificate ? 'Carregando...' : 'Gerar link da foto'}</button>
+      {certificateLink && <a href={certificateLink} target="_blank" rel="noreferrer">Abrir foto do atestado</a>}
+      {certificateError && <span role="alert">{certificateError}</span>}
+    </div>}
+    <p>Controle do cadastro</p><div className="status-controls"><button disabled={saving || student.status === 'active'} onClick={() => onStatus('active')}><Check size={16} /> Ativar</button><button disabled={saving || student.status === 'blocked'} onClick={() => onStatus('blocked')}><Archive size={16} /> Bloquear</button><button disabled={saving || student.status === 'inactive'} onClick={() => onStatus('inactive')}><X size={16} /> Inativar</button></div></div></aside></>;
 }
 
 function AgendaManager({ students, schedules, showForm, setShowForm, saving, setSaving, onCreate, onDelete, onFeedback }: { students: Student[]; schedules: WorkoutSchedule[]; showForm: boolean; setShowForm: (value: boolean) => void; saving: boolean; setSaving: (value: boolean) => void; onCreate: (values: { studentId: string; title: string; description: string; date: string; startTime: string; endTime: string; location: string }) => Promise<void>; onDelete: (id: string) => Promise<void>; onFeedback: (message: string) => void }) {
