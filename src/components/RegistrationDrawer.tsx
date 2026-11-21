@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { X } from 'lucide-react';
 import StudentRegistrationFields from '@/components/StudentRegistrationFields';
-import { todayInSantaMaria } from '@/lib/registration';
+import CertificateFields from '@/components/CertificateFields';
 
 interface RegistrationDrawerProps {
   kind: 'student' | 'collaborator';
@@ -40,15 +40,7 @@ export default function RegistrationDrawer({ kind, onClose, onSubmit }: Registra
         <form className="drawer-form" onSubmit={submit}>
           {kind === 'student' ? <>
             <StudentRegistrationFields />
-            <div className="drawer-divider" />
-            <p className="form-section-label standalone">Atestado para atividade física (opcional)</p>
-            <label className="field-label">Foto do atestado (JPG ou PNG, até 5 MB)
-              <input type="file" name="certificate" accept="image/jpeg,image/png" />
-            </label>
-            <label className="field-label">Data de emissão
-              <input type="date" name="issuedOn" max={todayInSantaMaria()} />
-            </label>
-            <p className="form-hint">Se anexar a foto, informe a data de emissão. A validade é de um ano.</p>
+            <CertificateFields />
           </> : <>
             <label className="field-label">E-mail acadêmico da UFSM
               <input name="email" type="email" required placeholder="nome@acad.ufsm.br" />

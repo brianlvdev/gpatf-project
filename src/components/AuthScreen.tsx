@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { ArrowRight, CalendarDays, CheckCircle2, Eye, EyeOff, HeartPulse, LockKeyhole, Phone, ShieldCheck, UserRound } from 'lucide-react';
 
+import CertificateFields from '@/components/CertificateFields';
 import StudentRegistrationFields from '@/components/StudentRegistrationFields';
 
 export type AuthRole = 'student' | 'admin';
@@ -81,6 +82,7 @@ export default function AuthScreen({ onLogin, onSignup, isLoading, error, notice
           ) : (
             <form className="form-stack signup-form" onSubmit={handleSignup}>
               <StudentRegistrationFields />
+              <CertificateFields />
               <button className="primary-button button-large" type="submit" disabled={isLoading}>{isLoading ? 'Criando sua ficha...' : 'Concluir cadastro'} <ArrowRight size={19} /></button>
               <button className="text-button" type="button" onClick={() => setMode('login')}>Já tenho cadastro <span>Voltar para o acesso</span></button>
             </form>

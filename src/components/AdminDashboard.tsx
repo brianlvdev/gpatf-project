@@ -2,11 +2,13 @@ import { FormEvent, useState } from 'react';
 import { Archive, Bell, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, FileText, LayoutDashboard, LogOut, Menu, Pencil, Plus, Search, ShieldCheck, Trash2, UserRound, Users, X } from 'lucide-react';
 import { AbsenceJustification, Announcement, Attendance, AttendanceStatus, Student, StudentStatus, WorkoutSchedule } from '@/types';
 
+import CertificateFields from '@/components/CertificateFields';
 import RegistrationDrawer from '@/components/RegistrationDrawer';
-import { certificateStatus, CERTIFICATE_BUCKET } from '@/lib/registration';
+import { certificateStatus, CERTIFICATE_BUCKET, registerAccount } from '@/lib/registration';
 import { supabase } from '@/lib/supabase';
 
 interface AdminDashboardProps {
+  onRefreshStudents: () => Promise<void>;
   onRegisterStudent: (fields: FormData) => Promise<void>;
   onRegisterCollaborator?: (fields: FormData) => Promise<void>;
   students: Student[];
@@ -31,7 +33,7 @@ type AdminView = 'overview' | 'students' | 'agenda' | 'attendance' | 'announceme
 const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)).replace('.', '');
 const formatTime = (time: string) => time.slice(0, 5);
 
-export default function AdminDashboard({ onRegisterStudent, onRegisterCollaborator, students, schedules, attendance, justifications, announcements, onUpdateStudent, onSetStudentStatus, onCreateSchedule, onDeleteSchedule, onSetAttendance, onReviewJustification, onCreateAnnouncement, onToggleAnnouncement, onDeleteAnnouncement, onSignOut }: AdminDashboardProps) {
+export default function AdminDashboard({ onRefreshStudents, onRegisterStudent, onRegisterCollaborator, students, schedules, attendance, justifications, announcements, onUpdateStudent, onSetStudentStatus, onCreateSchedule, onDeleteSchedule, onSetAttendance, onReviewJustification, onCreateAnnouncement, onToggleAnnouncement, onDeleteAnnouncement, onSignOut }: AdminDashboardProps) {
   const [registration, setRegistration] = useState<'student' | 'collaborator' | null>(null);
   const [activeView, setActiveView] = useState<AdminView>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -74,7 +76,7 @@ export default function AdminDashboard({ onRegisterStudent, onRegisterCollaborat
   return (
     <div className="app-shell admin-shell">
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
-        <div className="sidebar-brand"><div className="logo-frame"><img src="/image.png" alt="Logo GPATF" /></div><div><strong>GPATF</strong><span>Administração</span></div></div>
+        <button type="button" className="sidebar-brand home-brand" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><div className="logo-frame"><img src="/image.png" alt="Logo GPATF" /></div><div><strong>GPATF</strong><span>Administração</span></div></button>
         <nav className="side-nav">
           <button className={activeView === 'overview' ? 'active' : ''} onClick={() => navigate('overview')}><LayoutDashboard size={20} /> Visão geral</button>
           <button className={activeView === 'students' ? 'active' : ''} onClick={() => navigate('students')}><Users size={20} /> Alunos <span className="nav-count">{activeStudents.length}</span></button>
@@ -83,12 +85,12 @@ export default function AdminDashboard({ onRegisterStudent, onRegisterCollaborat
           <button className={activeView === 'announcements' ? 'active' : ''} onClick={() => navigate('announcements')}><Bell size={20} /> Avisos</button>
           {onRegisterCollaborator && <button onClick={() => { setMenuOpen(false); setRegistration('collaborator'); }}><Plus size={20} /> Cadastrar colaborador</button>}
         </nav>
+        <button type="button" className="primary-button sidebar-register" onClick={() => { setMenuOpen(false); setRegistration('student'); }}><Plus size={20} /> Cadastrar aluno</button>
         <div className="admin-side-status"><div className="status-pulse" /><div><strong>Painel ativo</strong><span>Dados atualizados</span></div></div>
-        <button className="logout-button" onClick={onSignOut}><LogOut size={18} /> Sair da conta</button>
       </aside>
       {menuOpen && <button className="sidebar-overlay" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
       <main className="main-content">
-        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : 'Avisos'}</strong></div><div className="topbar-user"><div className="avatar avatar-small admin-avatar"><ShieldCheck size={17} /></div><span>Equipe GPATF</span><button className="icon-button" onClick={onSignOut} aria-label="Sair"><LogOut size={18} /></button></div></header>
+        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : 'Avisos'}</strong></div><div className="topbar-user"><div className="avatar avatar-small admin-avatar"><ShieldCheck size={17} /></div><span>Equipe GPATF</span><button type="button" className="topbar-signout" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button></div></header>
         {feedback && <div className="toast"><CheckCircle2 size={18} /> {feedback}</div>}
 
         {activeView === 'overview' && <AdminOverview students={students} todaysSchedules={todaysSchedules} pendingJustifications={pendingJustifications} announcements={announcements} onNavigate={navigate} onReviewJustification={onReviewJustification} onCreateAnnouncement={onCreateAnnouncement} />}
@@ -103,7 +105,7 @@ export default function AdminDashboard({ onRegisterStudent, onRegisterCollaborat
         setRegistration(null);
         showFeedback(registration === 'student' ? 'Aluno cadastrado com sucesso.' : 'Colaborador cadastrado com sucesso.');
       }} />}
-      {selectedStudent && <StudentEditDrawer key={selectedStudent.id} student={selectedStudent} onClose={() => setSelectedStudent(null)} onSave={async (values) => { await onUpdateStudent(selectedStudent.id, values); setSelectedStudent({ ...selectedStudent, ...values }); showFeedback('Ficha atualizada com sucesso.'); }} onStatus={(status) => handleStatus(selectedStudent, status)} saving={saving} />}
+      {selectedStudent && <StudentEditDrawer key={selectedStudent.id} student={selectedStudent} onCertificateSaved={async (updated) => { setSelectedStudent(updated); await onRefreshStudents(); }} onClose={() => setSelectedStudent(null)} onSave={async (values) => { await onUpdateStudent(selectedStudent.id, values); setSelectedStudent({ ...selectedStudent, ...values }); showFeedback('Ficha atualizada com sucesso.'); }} onStatus={(status) => handleStatus(selectedStudent, status)} saving={saving} />}
     </div>
   );
 }
@@ -136,10 +138,35 @@ function StudentAdminRow({ student, onEdit, onStatus }: { student: Student; onEd
   return <div className="student-admin-row"><div className="avatar avatar-medium"><UserRound size={20} /></div><div className="student-row-main"><strong>{student.full_name}</strong><span>{student.phone ?? 'Sem telefone'} · Cadastro em {formatDate(student.created_at.slice(0, 10))}</span></div><span className={`status-badge ${student.status}`}>{student.status === 'active' ? 'Ativo' : student.status === 'blocked' ? 'Bloqueado' : 'Inativo'}</span><button className="outline-button" onClick={onEdit}><Pencil size={16} /> Abrir ficha</button><button className="icon-button row-more" aria-label="Mais opções" onClick={() => onStatus(student, student.status === 'active' ? 'blocked' : 'active')}>{student.status === 'active' ? <Archive size={17} /> : <Check size={17} />}</button></div>;
 }
 
-function StudentEditDrawer({ student, onClose, onSave, onStatus, saving }: { student: Student; onClose: () => void; onSave: (values: Partial<Student>) => Promise<void>; onStatus: (status: StudentStatus) => Promise<void>; saving: boolean }) {
+function StudentEditDrawer({ student, onCertificateSaved, onClose, onSave, onStatus, saving }: { student: Student; onCertificateSaved: (student: Student) => Promise<void>; onClose: () => void; onSave: (values: Partial<Student>) => Promise<void>; onStatus: (status: StudentStatus) => Promise<void>; saving: boolean }) {
   const [certificateLink, setCertificateLink] = useState('');
   const [certificateError, setCertificateError] = useState('');
   const [loadingCertificate, setLoadingCertificate] = useState(false);
+
+  const [savingCertificate, setSavingCertificate] = useState(false);
+  const [certificateFeedback, setCertificateFeedback] = useState('');
+
+  async function saveCertificate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setSavingCertificate(true);
+    setCertificateFeedback('');
+    try {
+      const fields = new FormData(form);
+      fields.set('studentId', student.id);
+      const result = await registerAccount('certificate', fields);
+      if (!result?.student) throw new Error('Não foi possível confirmar a atualização do atestado.');
+      setCertificateLink('');
+      setCertificateError('');
+      form.reset();
+      await onCertificateSaved(result.student);
+      setCertificateFeedback('Atestado salvo com sucesso.');
+    } catch (error) {
+      setCertificateFeedback(error instanceof Error ? error.message : 'Não foi possível salvar o atestado.');
+    } finally {
+      setSavingCertificate(false);
+    }
+  }
 
   async function loadCertificateLink() {
     if (!student.medical_certificate_path) return;
@@ -161,6 +188,11 @@ function StudentEditDrawer({ student, onClose, onSave, onStatus, saving }: { stu
       {certificateLink && <a href={certificateLink} target="_blank" rel="noreferrer">Abrir foto do atestado</a>}
       {certificateError && <span role="alert">{certificateError}</span>}
     </div>}
+    <form className="drawer-form" onSubmit={saveCertificate}>
+      <CertificateFields required />
+      <button type="submit" className="primary-button" disabled={savingCertificate}>{savingCertificate ? 'Salvando...' : student.medical_certificate_path ? 'Substituir atestado' : 'Anexar atestado'}</button>
+      {certificateFeedback && <p role="status">{certificateFeedback}</p>}
+    </form>
     <p>Controle do cadastro</p><div className="status-controls"><button disabled={saving || student.status === 'active'} onClick={() => onStatus('active')}><Check size={16} /> Ativar</button><button disabled={saving || student.status === 'blocked'} onClick={() => onStatus('blocked')}><Archive size={16} /> Bloquear</button><button disabled={saving || student.status === 'inactive'} onClick={() => onStatus('inactive')}><X size={16} /> Inativar</button></div></div></aside></>;
 }
 

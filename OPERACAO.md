@@ -31,6 +31,6 @@ Ao usar um projeto Supabase novo, aplique as três migrações na ordem do repos
 
 - O cadastro antigo pode ter deixado contas sem ficha. Antes de remover um usuário legado sem vínculo em `students.auth_id`, confirme o endereço e a identidade com a equipe e confira que ele não é uma conta administrativa. Depois, refaça o cadastro. Em caso de erro durante uma limpeza automática, o log da função contém o ID interno para investigação.
 - O login sem telefone usa o nome normalizado. Homônimos precisam usar identificadores distintos, por exemplo o telefone. Alterar o telefone ou nome na ficha administrativa atualmente não altera a credencial de login já emitida. Use para entrar o identificador informado no cadastro.
-- O painel oferece anexar o atestado durante o cadastro administrativo. Para alunos antigos ou renovação, ainda falta uma tela de substituição do documento.
+- Alunos podem enviar a foto e indicar a data de emissão no cadastro. A equipe pode conferir a imagem pela ficha e anexar ou substituir o atestado de um aluno existente. A data enviada no autocadastro é informada pelo aluno e deve ser conferida pela equipe.
 - O cadastro público continua aberto. Antes de uso em escala, configure proteção contra abuso para a função pública e monitore o volume de cadastros. O formulário ainda não tem recuperação de senha para os identificadores internos.
 - Bloquear um aluno impede sua entrada pelo frontend. As permissões legadas de acesso a dados do próprio aluno precisam ser revisadas para também revogar o acesso de sessões já ativas no momento do bloqueio.

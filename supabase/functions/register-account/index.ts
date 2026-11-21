@@ -53,7 +53,7 @@ Deno.serve(async (request) => {
   }
   const field = (name: string) => String(form.get(name) ?? '').trim();
   const action = field('action');
-  if (!['self', 'student', 'collaborator'].includes(action)) return reply(400, 'Cadastro inválido.');
+  if (!['self', 'student', 'collaborator', 'certificate'].includes(action)) return reply(400, 'Cadastro inválido.');
 
   if (action !== 'self') {
     const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];
@@ -64,6 +64,10 @@ Deno.serve(async (request) => {
     if (role !== 'master' && (role !== 'admin' || action === 'collaborator')) {
       return reply(403, 'Sua conta não tem permissão para este cadastro.');
     }
+  }
+
+  if (action === 'certificate') {
+    return await updateCertificate(field('studentId'), field('issuedOn'), form.get('certificate'));
   }
 
   const password = String(form.get('password') ?? '');
@@ -99,12 +103,12 @@ Deno.serve(async (request) => {
     return reply(400, 'Confira o nome, as datas, os telefones e os campos obrigatórios.');
   }
 
-  const issuedOn = action === 'student' ? field('issuedOn') : '';
+  const issuedOn = field('issuedOn');
   let avatar: Awaited<ReturnType<typeof readImage>>;
   let certificate: Awaited<ReturnType<typeof readImage>>;
   try {
     avatar = await readImage(form.get('avatar'));
-    certificate = action === 'student' ? await readImage(form.get('certificate')) : null;
+    certificate = await readImage(form.get('certificate'));
   } catch {
     return reply(400, 'Envie fotos JPG ou PNG com até 5 MB cada.');
   }
@@ -164,6 +168,63 @@ Deno.serve(async (request) => {
     return reply(500, 'Não foi possível concluir o cadastro. Tente novamente ou procure a equipe GPATF.');
   }
 });
+
+async function updateCertificate(studentId: string, issuedOn: string, value: FormDataEntryValue | null) {
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(studentId) ||
+      !readDate(issuedOn) || issuedOn > todayInSantaMaria()) {
+    return reply(400, 'Informe uma data de emissão válida.');
+  }
+
+  let image: Awaited<ReturnType<typeof readImage>>;
+  try {
+    image = await readImage(value);
+  } catch {
+    return reply(400, 'Envie uma foto JPG ou PNG com até 5 MB.');
+  }
+  if (!image) return reply(400, 'Anexe a foto do atestado.');
+
+  const { data: student, error } = await service.from('students')
+    .select('auth_id, medical_certificate_path').eq('id', studentId).maybeSingle();
+  if (error) return reply(500, 'Não foi possível consultar a ficha.');
+  if (!student) return reply(404, 'Ficha do aluno não encontrada.');
+
+  const path = `${student.auth_id}/atestado-${crypto.randomUUID()}.${image.extension}`;
+  const bucket = service.storage.from(certificateBucket);
+  const upload = await bucket.upload(path, image.file, { contentType: image.type });
+  if (upload.error) return reply(500, 'Não foi possível enviar a foto do atestado.');
+
+  const previousPath = student.medical_certificate_path;
+  const update = service.from('students').update({
+    medical_certificate_path: path,
+    medical_certificate_issued_on: issuedOn,
+    updated_at: new Date().toISOString(),
+  }).eq('id', studentId);
+  const guarded = previousPath
+    ? update.eq('medical_certificate_path', previousPath)
+    : update.is('medical_certificate_path', null);
+  const result = await guarded.select('*').maybeSingle();
+  let saved = result.data;
+  if (result.error) {
+    const check = await service.from('students').select('*').eq('id', studentId).maybeSingle();
+    if (check.error) {
+      console.error('Could not verify replacement certificate', studentId);
+      return reply(500, 'Não foi possível confirmar o atestado. Reabra a ficha antes de tentar novamente.');
+    }
+    if (check.data?.medical_certificate_path === path) saved = check.data;
+  }
+  if (!saved) {
+    const cleanup = await bucket.remove([path]);
+    if (cleanup.error) console.error('Could not remove unused certificate', studentId);
+    return result.error
+      ? reply(500, 'Não foi possível salvar o atestado.')
+      : reply(409, 'A ficha foi alterada. Recarregue e tente novamente.');
+  }
+  if (previousPath) {
+    const cleanup = await bucket.remove([previousPath]);
+    if (cleanup.error) console.error('Could not remove replaced certificate', studentId);
+  }
+  return Response.json({ student: saved }, { headers });
+}
 
 function accountError(error: { code?: string }) {
   if (error.code === 'email_exists' || error.code === 'user_already_exists') {
