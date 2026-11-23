@@ -116,7 +116,7 @@ function App() {
       supabase.from('attendance').select('*').order('attendance_date', { ascending: false }),
       supabase.from('attendance_confirmations').select('*').order('attendance_date', { ascending: false }),
       supabase.from('absence_justifications').select('*').order('created_at', { ascending: false }),
-      supabase.from('announcements').select('*').order('created_at', { ascending: false }),
+      supabase.from('announcements').select('*').is('removed_at',null).order('created_at', { ascending: false }),
     ]);
     if (studentsResponse.error || scheduleResponse.error || attendanceResponse.error || confirmationResponse.error || justificationResponse.error || announcementResponse.error) {
       setAuthError(genericError);
