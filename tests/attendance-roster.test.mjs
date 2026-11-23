@@ -1,0 +1,13 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+const exercises=ts.transpile(readFileSync(new URL('../src/lib/exercises.ts',import.meta.url),'utf8'),{module:ts.ModuleKind.ES2022});
+const exercisesUrl='data:text/javascript;base64,'+Buffer.from(exercises).toString('base64');
+const source=ts.transpile(readFileSync(new URL('../src/lib/attendanceRoster.ts',import.meta.url),'utf8'),{module:ts.ModuleKind.ES2022}).replace("'./exercises'",JSON.stringify(exercisesUrl));
+const {filterAttendanceRoster}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const students=Array.from({length:42},(_,i)=>({id:String(i),full_name:i===0?'João Silva':`Aluno ${String(i).padStart(2,'0')}`,phone:i===0?'55999990000':null,status:i===41?'inactive':'active'}));
+const confirmed=new Set(['0','4','8']);
+test('sem filtro inclui todos os 42 alunos, inclusive inativos e sem agenda',()=>{assert.equal(filterAttendanceRoster(students,confirmed,'','all').length,42);});
+test('filtros dividem confirmação sem perder alunos',()=>{const yes=filterAttendanceRoster(students,confirmed,'','confirmed');const no=filterAttendanceRoster(students,confirmed,'','unconfirmed');assert.equal(yes.length,3);assert.equal(no.length,39);assert.equal(new Set([...yes,...no].map(s=>s.id)).size,42);});
+test('pesquisa ignora acentos, busca telefone e combina com filtro',()=>{assert.equal(filterAttendanceRoster(students,confirmed,'joao','all')[0].id,'0');assert.equal(filterAttendanceRoster(students,confirmed,'5599999','all')[0].id,'0');assert.equal(filterAttendanceRoster(students,confirmed,'joao','unconfirmed').length,0);});
