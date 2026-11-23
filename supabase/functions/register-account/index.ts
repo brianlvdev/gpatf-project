@@ -119,7 +119,7 @@ Deno.serve(async (request) => {
   } catch {
     return reply(400, 'Envie fotos JPG ou PNG com até 5 MB cada.');
   }
-  if (Boolean(certificate) !== Boolean(issuedOn) ||
+  if ((!certificate && Boolean(issuedOn)) ||
       (issuedOn && (!readDate(issuedOn) || issuedOn > todayInSantaMaria()))) {
     return reply(400, 'Anexe a foto do atestado e informe uma data de emissão válida.');
   }
@@ -187,7 +187,7 @@ async function updateStudentImage(
   if (!ownerId && !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(studentId ?? '')) {
     return reply(400, 'Selecione uma ficha válida.');
   }
-  if (isCertificate && (!readDate(issuedOn) || issuedOn > todayInSantaMaria())) {
+  if (isCertificate && issuedOn && (!readDate(issuedOn) || issuedOn > todayInSantaMaria())) {
     return reply(400, 'Informe uma data de emissão válida.');
   }
 
@@ -213,7 +213,7 @@ async function updateStudentImage(
   const column = isCertificate ? 'medical_certificate_path' : 'avatar_path';
   const previousPath = student[column];
   const fields = isCertificate
-    ? { medical_certificate_path: path, medical_certificate_issued_on: issuedOn }
+    ? { medical_certificate_path: path, medical_certificate_issued_on: issuedOn || null }
     : { avatar_path: path };
   let update = service.from('students').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', student.id);
   if (ownerId) update = update.eq('status', 'active');

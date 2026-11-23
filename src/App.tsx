@@ -1,3 +1,4 @@
+import DialogAccessibility from './components/DialogAccessibility';
 import { useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import AuthScreen, { AuthRole } from '@/components/AuthScreen';
@@ -180,6 +181,8 @@ function App() {
 
   async function handleConfirmPresence(schedule: WorkoutSchedule) {
     if (!student) return;
+    const existing = confirmations.some(c => c.attendance_date === schedule.scheduled_date);
+    if (existing) { const {error} = await supabase.from('attendance_confirmations').delete().eq('student_id',student.id).eq('attendance_date',schedule.scheduled_date); if(error) throw new Error('Não foi possível remover a presença.'); await loadStudentData(student); return; }
     const { error } = await supabase.from('attendance_confirmations').upsert({ student_id: student.id, schedule_id: schedule.id, attendance_date: schedule.scheduled_date }, { onConflict: 'student_id,attendance_date' });
     if (error) throw new Error('confirmation');
     await loadStudentData(student);
@@ -295,11 +298,11 @@ function App() {
   }
 
   if (isBooting) return <div className="loading-screen"><div className="loading-mark"><img src="/image.png" alt="Logo GPATF" /></div><div className="loading-line" /><p>Preparando seu espaço GPATF...</p></div>;
-  if (!session || !role) return <AuthScreen onLogin={handleLogin} onSignup={handleSignup} isLoading={isLoading} error={authError} notice={notice} />;
+  if (!session || !role) return <><DialogAccessibility /><AuthScreen onLogin={handleLogin} onSignup={handleSignup} isLoading={isLoading} error={authError} notice={notice} /></>;
   if (authError) return <div className="loading-screen" role="alert"><p>{authError}</p><button className="primary-button" onClick={() => { setAuthError(''); window.location.reload(); }}>Tentar novamente</button><button className="outline-button" onClick={handleSignOut}>Sair</button></div>;
-  if (role === 'admin') return <AdminDashboard onRefreshStudents={loadAdminData} onRegisterStudent={handleAdminSignup} onRegisterCollaborator={session.user.app_metadata.gpatf_role === 'master' ? async (values) => { await registerAccount('collaborator', values); } : undefined} students={students} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} onUpdateStudent={handleUpdateStudent} onSetStudentStatus={handleSetStudentStatus} onCreateSchedule={handleCreateSchedule} onUpdateWorkoutPlan={handleUpdateWorkoutPlan} onDeleteSchedule={handleDeleteSchedule} onSetAttendance={handleSetAttendance} onReviewJustification={handleReviewJustification} onCreateAnnouncement={handleCreateAnnouncement} onToggleAnnouncement={handleToggleAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onSignOut={handleSignOut} />;
+  if (role === 'admin') return <><DialogAccessibility /><AdminDashboard onRefreshStudents={loadAdminData} onRegisterStudent={handleAdminSignup} onRegisterCollaborator={session.user.app_metadata.gpatf_role === 'master' ? async (values) => { await registerAccount('collaborator', values); } : undefined} students={students} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} onUpdateStudent={handleUpdateStudent} onSetStudentStatus={handleSetStudentStatus} onCreateSchedule={handleCreateSchedule} onUpdateWorkoutPlan={handleUpdateWorkoutPlan} onDeleteSchedule={handleDeleteSchedule} onSetAttendance={handleSetAttendance} onReviewJustification={handleReviewJustification} onCreateAnnouncement={handleCreateAnnouncement} onToggleAnnouncement={handleToggleAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onSignOut={handleSignOut} /></>;
   if (!student) return <div className="loading-screen"><p>Carregando sua ficha...</p></div>;
-  return <StudentDashboard student={student} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} avatarUrl={avatarUrl} onEditProfile={handleEditOwnProfile} onUploadCertificate={handleOwnCertificate} onUploadAvatar={handleOwnAvatar} onConfirmPresence={handleConfirmPresence} onSubmitJustification={handleSubmitJustification} onSignOut={handleSignOut} />;
+  return <><DialogAccessibility /><StudentDashboard student={student} schedules={schedules} attendance={attendance} confirmations={confirmations} justifications={justifications} announcements={announcements} avatarUrl={avatarUrl} onEditProfile={handleEditOwnProfile} onUploadCertificate={handleOwnCertificate} onUploadAvatar={handleOwnAvatar} onConfirmPresence={handleConfirmPresence} onSubmitJustification={handleSubmitJustification} onSignOut={handleSignOut} /></>;
 }
 
 export default App;

@@ -8,8 +8,8 @@ export function todayInSantaMaria() {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 }
 
-export function certificateStatus(expiresOn: string | null, today = todayInSantaMaria()) {
-  if (!expiresOn) return 'Nenhum atestado registrado';
+export function certificateStatus(expiresOn: string | null, today = todayInSantaMaria(), path?: string | null) {
+  if (!expiresOn) return path ? 'Atestado anexado · validade não informada' : 'Nenhum atestado registrado';
   const days = (Date.parse(expiresOn) - Date.parse(today)) / 86_400_000;
   const formatted = expiresOn.split('-').reverse().join('/');
   if (days < 0) return `Vencido em ${formatted}`;
