@@ -8,19 +8,20 @@ export default function NotificationCenter({staff,onNavigate}:{staff:boolean;onN
  const [open,setOpen]=useState(false);const [items,setItems]=useState<SiteNotification[]>([]);const [read,setRead]=useState<string[]>([]);const [error,setError]=useState('');const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const root=useRef<HTMLDivElement>(null);const panelId=useId();
  useEffect(()=>{let live=true;
  async function load(){const today=todayInSantaMaria();const since=new Date(Date.parse(today)-30*86400000).toISOString().slice(0,10);
- const [messages,publications,schedules,plans,students,justifications,confirmations,attendance,receipts,messageReads]=await Promise.all([
+ const [messages,publications,schedules,plans,students,justifications,confirmations,attendance,receipts,messageReads,planRequests]=await Promise.all([
  supabase.from('support_messages').select('id,author_name,body,created_at').eq('is_staff',!staff).order('created_at',{ascending:false}).limit(50),
  supabase.from('announcements').select('*').eq('active',true).is('removed_at',null).order('created_at',{ascending:false}).limit(50),
  supabase.from('workout_schedules').select('*').gte('scheduled_date',today).order('scheduled_date').limit(100),
- supabase.from('student_workout_plans').select('*').order('updated_at',{ascending:false}).limit(100),
+ supabase.from('student_workout_plans').select('*').order('updated_at',{ascending:false}).limit(1000),
  supabase.from('students').select('*').order('created_at',{ascending:false}).limit(1000),
  supabase.from('absence_justifications').select('*').gte('created_at',since).order('created_at',{ascending:false}).limit(100),
  supabase.from('attendance_confirmations').select('*').gte('attendance_date',since).order('confirmed_at',{ascending:false}).limit(100),
  supabase.from('attendance').select('*').gte('attendance_date',since).order('attendance_date',{ascending:false}).limit(100),
  supabase.from('notification_receipts').select('event_key').order('read_at',{ascending:false}).limit(1000),
- supabase.from('support_reads').select('message_id').limit(1000)]);
- if(!live)return;if([messages,publications,schedules,plans,students,justifications,confirmations,attendance,receipts,messageReads].some(r=>r.error)){setError('Não foi possível atualizar todas as notificações.');setLoading(false);return;}
- setItems(siteNotifications({staff,today,messages:messages.data??[],announcements:publications.data??[],schedules:schedules.data??[],plans:plans.data??[],students:students.data??[],justifications:justifications.data??[],confirmations:confirmations.data??[],attendance:attendance.data??[]}));
+ supabase.from('support_reads').select('message_id').limit(1000),
+ supabase.from('workout_plan_requests').select('*').limit(1000)]);
+ if(!live)return;if([messages,publications,schedules,plans,students,justifications,confirmations,attendance,receipts,messageReads,planRequests].some(r=>r.error)){setError('Não foi possível atualizar todas as notificações.');setLoading(false);return;}
+ setItems(siteNotifications({staff,today,requests:planRequests.data??[],messages:messages.data??[],announcements:publications.data??[],schedules:schedules.data??[],plans:plans.data??[],students:students.data??[],justifications:justifications.data??[],confirmations:confirmations.data??[],attendance:attendance.data??[]}));
  setRead(old=>[...new Set([...old,...(receipts.data??[]).map(r=>r.event_key),...(messageReads.data??[]).map(r=>`message:${r.message_id}`)])]);setError('');setLoading(false);
  }
  void load();const timer=window.setInterval(load,30000);return()=>{live=false;window.clearInterval(timer);};},[staff]);
