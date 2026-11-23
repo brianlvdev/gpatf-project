@@ -78,5 +78,5 @@ export interface Announcement {
 }
 
 export interface Collaborator { id: string; full_name: string; email: string; role: string; active: boolean; }
-export interface ExerciseItem { id: string; group: string; name: string; sets: string; reps: string; load: string; rest: string; }
+export interface ExerciseItem { machine_number?: string; id: string; group: string; name: string; sets: string; reps: string; load: string; rest: string; }
 export interface StudentPlan { student_id: string; exercises: ExerciseItem[]; notes: string; created_by_name: string; updated_by_name: string; updated_at: string; }
