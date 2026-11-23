@@ -1,3 +1,5 @@
+import { useSmoothView } from '@/lib/useSmoothView';
+import PageStage from './PageStage';
 import ImportantNotices from './ImportantNotices';
 import SupportChat from './SupportChat';
 import AnnouncementCarousel from './AnnouncementCarousel';
@@ -31,7 +33,7 @@ const formatTime = (time: string) => time.slice(0, 5);
 export default function StudentDashboard({ student, schedules, attendance, confirmations, justifications, announcements, avatarUrl, onEditProfile, onUploadCertificate, onUploadAvatar, onConfirmPresence, onSubmitJustification, onSignOut }: StudentDashboardProps) {
   const [presenceBusy, setPresenceBusy] = useState(false);
   async function togglePresence(schedule: WorkoutSchedule) { if(presenceBusy) return; setPresenceBusy(true); try { await onConfirmPresence(schedule); } catch { setMessage('Não foi possível atualizar a presença. Tente novamente.'); } finally { setPresenceBusy(false); } }
-  const [activeView, setActiveView] = useState<'overview' | 'agenda' | 'profile' | 'absence' | 'messages'>('overview');
+  const {view:activeView,loading:pageLoading,navigate:changeView} = useSmoothView<'overview' | 'agenda' | 'profile' | 'absence' | 'messages'>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [absenceDate, setAbsenceDate] = useState('');
   const [absenceReason, setAbsenceReason] = useState('');
@@ -61,7 +63,7 @@ export default function StudentDashboard({ student, schedules, attendance, confi
   };
 
   const navigate = (view: 'overview' | 'agenda' | 'profile' | 'absence' | 'messages') => {
-    setActiveView(view);
+    changeView(view);
     setMenuOpen(false);
   };
 
@@ -86,7 +88,7 @@ export default function StudentDashboard({ student, schedules, attendance, confi
         <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Área do aluno</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'agenda' ? 'Minha agenda' : activeView === 'absence' ? 'Justificar falta' : activeView === 'messages' ? 'Mensagens' : 'Minha ficha'}</strong></div><div className="topbar-user"><SupportChat student={student} compact onOpenMessages={() => navigate('messages')} /><button className="profile-shortcut" onClick={() => navigate('profile')} aria-label="Abrir meu perfil"><div className="avatar avatar-small">{avatarUrl ? <img src={avatarUrl} alt="Foto de perfil" /> : <UserRound size={17} />}</div><span>{student.full_name.split(' ')[0]}</span></button></div></header>
         {activeView !== 'overview' && <button className="outline-button back-overview" onClick={() => navigate('overview')}>Voltar à visão geral</button>}
 
-        <div key={activeView} className="page-transition">
+        <PageStage loading={pageLoading} view={activeView}>
         {activeView === 'messages' && <section className="view-section messages-view"><div className="section-title-row"><div><p className="eyebrow">Atendimento GPATF</p><h1>Mensagens</h1><p className="section-lede">Acompanhe suas conversas e respostas.</p></div></div><SupportChat student={student} embedded /></section>}
         {activeView === 'overview' && <>
           <ImportantNotices announcements={announcements} />
@@ -102,7 +104,7 @@ export default function StudentDashboard({ student, schedules, attendance, confi
         {activeView === 'profile' && <section className="view-section"><div className="section-title-row"><div><p className="eyebrow">Informações importantes</p><h1>Minha ficha</h1><p className="section-lede">Confira seus dados e os cuidados que a equipe deve conhecer.</p></div><div className="profile-header-avatar">{avatarUrl ? <img src={avatarUrl} alt="Foto de perfil" /> : <UserRound size={30} />}</div></div><div className="profile-layout"><div className="content-card profile-card"><div className="profile-card-title"><UserRound size={19} /><h2>Dados pessoais</h2></div><InfoLine label="Nome completo" value={student.full_name} /><InfoLine label="Data de nascimento" value={new Intl.DateTimeFormat('pt-BR').format(new Date(`${student.birth_date}T12:00:00`))} /><InfoLine label="Telefone" value={student.phone ?? 'Não informado'} /><InfoLine label="Endereço" value={student.address} /><InfoLine label="Atestado para atividade física" value={certificateStatus(student.medical_certificate_expires_on, undefined, student.medical_certificate_path)} /></div><div className="content-card profile-card"><div className="profile-card-title"><ShieldCheck size={19} /><h2>Contato de emergência</h2></div><InfoLine label="Nome" value={student.emergency_contact_name} /><InfoLine label="Telefone" value={student.emergency_contact_phone} /><div className="health-note"><HeartPulse size={20} /><div><strong>Cuidados importantes</strong><p>{student.comorbidities || 'Nenhum cuidado informado no cadastro.'}</p></div></div></div></div><StudentProfileEditor student={student} onEditProfile={onEditProfile} onUploadCertificate={onUploadCertificate} onUploadAvatar={onUploadAvatar} /></section>}
 
         {activeView === 'absence' && <section className="view-section"><div className="section-title-row"><div><p className="eyebrow">Comunicação com a equipe</p><h1>Justificar uma falta</h1><p className="section-lede">Conte o que aconteceu. Sua justificativa será analisada pela administração.</p></div><div className="round-icon"><FileText size={24} /></div></div><div className="absence-layout"><form className="content-card form-card" onSubmit={submitAbsence}><div className="card-heading"><div><h2>Enviar justificativa</h2><p>Preencha os dados abaixo.</p></div></div><label className="field-label">Data da falta<input required type="date" value={absenceDate} onChange={(event) => setAbsenceDate(event.target.value)} /></label><label className="field-label">O que aconteceu?<textarea required rows={5} value={absenceReason} onChange={(event) => setAbsenceReason(event.target.value)} placeholder="Escreva uma breve explicação..." /></label><label className="upload-box compact"><div className="upload-icon"><FileText size={20} /></div><div><strong>{absenceFile ? absenceFile.name : 'Anexar atestado ou documento'}</strong><small>Opcional · PDF, JPG ou PNG</small></div><input type="file" accept="application/pdf,image/png,image/jpeg" onChange={(event) => setAbsenceFile(event.target.files?.[0] ?? null)} /></label>{message && <div className={message.includes('não foi') ? 'alert alert-error' : 'alert alert-success'}>{message}</div>}<button className="primary-button button-large" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Enviando...' : 'Enviar justificativa'} <ArrowIcon /></button></form><div className="content-card history-card"><div className="card-heading"><div><p className="eyebrow">Acompanhe</p><h2>Minhas justificativas</h2></div></div>{justifications.length ? justifications.map((item) => <div className="justification-row" key={item.id}><div className="justification-date"><strong>{new Date(`${item.absence_date}T12:00:00`).getDate()}</strong><span>{new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(new Date(`${item.absence_date}T12:00:00`)).replace('.', '')}</span></div><div><strong>{item.reason}</strong><span className={`status-text ${item.status}`}>{item.status === 'pending' ? 'Em análise' : item.status === 'approved' ? 'Aprovada' : 'Não aprovada'}</span></div></div>) : <div className="empty-state"><FileText size={28} /><p>Você ainda não enviou justificativas.</p></div>}</div></div></section>}
-        </div>
+        </PageStage>
       </main>
     </div>
   );

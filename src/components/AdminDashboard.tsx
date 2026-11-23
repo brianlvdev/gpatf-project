@@ -1,3 +1,5 @@
+import { useSmoothView } from '@/lib/useSmoothView';
+import PageStage from './PageStage';
 import DeveloperHelp from './DeveloperHelp';
 import ImportantNotices from './ImportantNotices';
 import AttendanceManager from './AttendanceRoster';
@@ -46,7 +48,7 @@ const formatTime = (time: string) => time.slice(0, 5);
 
 export default function AdminDashboard({ accountName, accountRole, onRefreshStudents, onRegisterStudent, onRegisterCollaborator, students, schedules, attendance, confirmations, justifications, announcements, onUpdateStudent, onSetStudentStatus, onCreateSchedule, onUpdateWorkoutPlan, onDeleteSchedule, onSetAttendance, onReviewJustification, onCreateAnnouncement, onToggleAnnouncement, onDeleteAnnouncement, onSignOut }: AdminDashboardProps) {
   const [registration, setRegistration] = useState<'student' | 'collaborator' | null>(null);
-  const [activeView, setActiveView] = useState<AdminView>('overview');
+  const {view:activeView,loading:pageLoading,navigate:changeView} = useSmoothView<AdminView>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -62,7 +64,7 @@ export default function AdminDashboard({ accountName, accountRole, onRefreshStud
   const filteredStudents = students.filter((student) => student.full_name.toLowerCase().includes(search.toLowerCase()) || (student.phone ?? '').includes(search));
 
   const navigate = (view: AdminView) => {
-    setActiveView(view);
+    changeView(view);
     setMenuOpen(false);
   };
 
@@ -112,7 +114,7 @@ export default function AdminDashboard({ accountName, accountRole, onRefreshStud
       <main className="main-content">
         <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : activeView === 'plans' ? 'Fichas de treino' : activeView === 'collaborators' ? 'Colaboradores' : activeView === 'messages' ? 'Mensagens' : 'Anúncios e avisos'}</strong></div><div className="session-summary" aria-label="Sessão conectada"><strong>{accountName}</strong><span>{accountRole} · Sessão ativa</span></div><div className="topbar-user"><SupportChat students={students} onOpenMessages={() => navigate('messages')} /></div></header>
         {activeView !== 'overview' && <button className="outline-button back-overview" onClick={() => navigate('overview')}>Voltar à visão geral</button>}
-        <div key={activeView} className="page-transition">
+        <PageStage loading={pageLoading} view={activeView}>
         {activeView === 'messages' && <section className="view-section messages-view"><div className="section-title-row"><div><p className="eyebrow">Atendimento GPATF</p><h1>Mensagens</h1><p className="section-lede">Acompanhe suas conversas e respostas.</p></div></div><SupportChat students={students} embedded /></section>}
         {feedback && <div className="toast"><CheckCircle2 size={18} /> {feedback}</div>}
 
@@ -123,7 +125,7 @@ export default function AdminDashboard({ accountName, accountRole, onRefreshStud
         {activeView === 'announcements' && <AnnouncementsManager announcements={announcements} onCreate={onCreateAnnouncement} onToggle={onToggleAnnouncement} onDelete={onDeleteAnnouncement} />}
         {activeView === 'plans' && <TrainingPlans students={students} />}
         {activeView === 'collaborators' && <CollaboratorsList key={registration ?? 'team'} />}
-        </div>
+        </PageStage>
       </main>
       {registration && <RegistrationDrawer key={registration} kind={registration} onClose={() => setRegistration(null)} onSubmit={async (fields) => {
         if (registration === 'student') await onRegisterStudent(fields);
