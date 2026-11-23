@@ -1,9 +1,10 @@
+import AttendanceManager from './AttendanceRoster';
 import SupportChat from './SupportChat';
 import TrainingPlans, { CollaboratorsList } from './TrainingPlans';
 import AnnouncementsManager, { CreateAnnouncement } from './AnnouncementsManager';
 import AnnouncementCarousel from './AnnouncementCarousel';
 import { FormEvent, useState } from 'react';
-import { Archive, Bell, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileText, LayoutDashboard, LogOut, Menu, Pencil, Plus, Search, ShieldCheck, Trash2, UserRound, Users, X } from 'lucide-react';
+import { Archive, Bell, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, FileText, LayoutDashboard, LogOut, Menu, Pencil, Plus, Search, ShieldCheck, Trash2, UserRound, Users, X } from 'lucide-react';
 import { AbsenceJustification, Announcement, Attendance, AttendanceConfirmation, AttendanceStatus, Student, StudentStatus, WorkoutSchedule } from '@/types';
 
 import CertificateFields from '@/components/CertificateFields';
@@ -244,99 +245,4 @@ function WorkoutPlanEditor({ schedule, onSave }: {
       {message && <p role="status">{message}</p>}
     </form>
   </details>;
-}
-
-const attendanceOptions = [
-  { status: 'present', label: 'Presente', message: 'Presença registrada.' },
-  { status: 'absent', label: 'Ausente', message: 'Falta registrada.' },
-  { status: 'justified', label: 'Justificada', message: 'Falta justificada.' },
-] as const;
-const attendanceMonths = Array.from({ length: 12 }, (_, month) =>
-  new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, month, 1))));
-
-function AttendanceManager({ students, attendance, confirmations, schedules, onSetAttendance, onFeedback }: {
-  students: Student[];
-  attendance: Attendance[];
-  confirmations: AttendanceConfirmation[];
-  schedules: WorkoutSchedule[];
-  onSetAttendance: AdminDashboardProps['onSetAttendance'];
-  onFeedback: (message: string) => void;
-}) {
-  const [date, setDate] = useState(todayInSantaMaria);
-  const [attendanceSearch,setAttendanceSearch] = useState('');
-  const [savingStudent, setSavingStudent] = useState<string | null>(null);
-  const [year, month] = date.split('-').map(Number);
-  const currentYear = Number(todayInSantaMaria().slice(0, 4));
-  const years = Array.from(new Set([...Array.from({ length: 11 }, (_, offset) => currentYear - 5 + offset), year])).sort((a, b) => a - b);
-  const relevantSchedules = schedules.filter((schedule) => schedule.scheduled_date === date && schedule.status !== 'cancelled');
-  const scheduledStudents = students.filter((student) => relevantSchedules.some((schedule) => schedule.student_id === student.id));
-  const confirmedIds = new Set(confirmations.filter((item) => item.attendance_date === date).map((item) => item.student_id));
-  const groups = [
-    { title: 'Confirmaram presença', students: scheduledStudents.filter((student) => confirmedIds.has(student.id) && student.full_name.toLowerCase().includes(attendanceSearch.toLowerCase())) },
-    { title: 'Ainda não confirmaram', students: scheduledStudents.filter((student) => !confirmedIds.has(student.id) && student.full_name.toLowerCase().includes(attendanceSearch.toLowerCase())) },
-  ];
-
-  function changePeriod(nextYear: number, nextMonth: number) {
-    setDate(`${nextYear}-${String(nextMonth).padStart(2, '0')}-01`);
-  }
-
-  function moveDay(offset: number) {
-    const next = new Date(`${date}T12:00:00Z`);
-    next.setUTCDate(next.getUTCDate() + offset);
-    setDate(next.toISOString().slice(0, 10));
-  }
-
-  async function record(studentId: string, option: typeof attendanceOptions[number]) {
-    setSavingStudent(studentId);
-    try {
-      await onSetAttendance(studentId, date, option.status, '');
-      onFeedback(option.message);
-    } catch {
-      onFeedback('Não foi possível registrar a presença. Tente novamente.');
-    } finally {
-      setSavingStudent(null);
-    }
-  }
-
-  return <section className="view-section">
-    <div className="section-title-row">
-      <div><h1>Controle de presença</h1><p className="section-lede">Registre a presença dos alunos com treino no dia.</p></div>
-      <div className="round-icon"><CheckCircle2 size={24} /></div>
-    </div>
-    <div className="content-card attendance-period">
-      <label className="field-label">Mês<select value={month} onChange={(event) => changePeriod(year, Number(event.target.value))}>
-        {attendanceMonths.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}
-      </select></label>
-      <label className="field-label">Ano<select value={year} onChange={(event) => changePeriod(Number(event.target.value), month)}>
-        {years.map((value) => <option key={value}>{value}</option>)}
-      </select></label>
-      <div className="attendance-day">
-        <button type="button" className="outline-button" aria-label="Dia anterior" onClick={() => moveDay(-1)}><ChevronLeft size={20} /></button>
-        <strong aria-live="polite">{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))}</strong>
-        <button type="button" className="outline-button" aria-label="Próximo dia" onClick={() => moveDay(1)}><ChevronRight size={20} /></button>
-      </div>
-    </div>
-    <label className="field-label">Buscar aluno<input type="search" value={attendanceSearch} onChange={e=>setAttendanceSearch(e.target.value)} /></label>{groups.map((group) => <section className="content-card attendance-card" key={group.title}>
-      <h2>{group.title} ({group.students.length})</h2>
-      {group.students.length === 0 && <p className="attendance-empty">Nenhum aluno neste grupo.</p>}
-      {group.students.map((student) => {
-        const records = attendance.filter((item) => item.student_id === student.id);
-        const current = records.find((item) => item.attendance_date === date)?.status ?? 'pending';
-        const absences = records.filter((item) => item.status === 'absent').length;
-        const workouts = relevantSchedules.filter((schedule) => schedule.student_id === student.id);
-        return <div className="attendance-row" key={student.id}>
-          <div className="avatar avatar-medium"><UserRound size={19} /></div>
-          <div className="student-row-main"><strong>{student.full_name}</strong>
-            <span>{workouts.map((workout) => workout.title).join(' · ')}</span>
-            <span>Faltas registradas: {absences}</span>
-          </div>
-          <div className="attendance-buttons">{attendanceOptions.map((option) =>
-            <button type="button" key={option.status} aria-pressed={current === option.status}
-              disabled={savingStudent !== null}
-              className={current === option.status ? `active ${option.status}` : ''}
-              onClick={() => record(student.id, option)}>{option.label}</button>)}</div>
-        </div>;
-      })}
-    </section>)}
-  </section>;
 }
