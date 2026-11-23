@@ -386,3 +386,16 @@ input, textarea, select { color: var(--ink); }
 .carousel-controls { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 14px; border-top: 1px solid #dbe8f0; }
 .primary-button,.outline-button { transition: background-color .15s,box-shadow .15s; }.primary-button:hover { box-shadow: 0 8px 20px #173d5f25; }
 @media(max-width:640px) { .student-metrics { grid-template-columns: 1fr; }.plan-student { align-items: stretch; flex-direction: column; }.exercise-filters { grid-template-columns: 1fr; }.carousel-slide { flex-direction: column; }.carousel-image { width: 100%; height: 200px; }.carousel-copy { padding: 20px; }.carousel-controls { flex-wrap: wrap; gap: 10px; }.side-nav { margin-top: 24px; } }
+
+/* Centered dialogs across registration, profiles, workouts and support. */
+.drawer-backdrop { background: #12334d66; backdrop-filter: blur(6px); }
+.edit-drawer { inset: 50% auto auto 50%; transform: translate(-50%,-50%); width: min(760px,calc(100vw - 32px)); max-height: calc(100dvh - 40px); height: auto; border-radius: 22px; box-shadow: 0 24px 80px #102a4355; overflow-y:auto; }
+.profile-shortcut { display:flex; align-items:center; gap:10px; background:none; border:0; color:inherit; cursor:pointer; }
+.student-name-link { border:0; padding:0; background:none; color:var(--navy); font-weight:800; text-align:left; cursor:pointer; }
+.student-plan { background:linear-gradient(120deg,#f0f8fc,#fff); border:1px solid #dceaf2; border-radius:20px; }.plan-empty-copy { color:#8495a3; line-height:1.7; max-width:500px; }
+.agenda-day-heading { background:#e8f3fa; color:var(--navy); padding:14px 18px; border-radius:12px; margin:28px 0 4px; }
+.notification-bell { position:relative; }.notification-bell span { color:var(--blue); }.support-launch { width:calc(100% - 20px); text-align:left; cursor:pointer; }
+.support-threads { display:grid; gap:6px; max-height:180px; overflow:auto; margin:12px 0; }.support-threads button { border:1px solid #dceaf2; background:#f8fbfd; padding:12px; text-align:left; border-radius:10px; }.support-threads button.active { border-color:var(--blue); }.support-threads small { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.support-history { max-height:300px; overflow:auto; padding:12px 0; }.support-history article { padding:14px; border-radius:12px; margin-bottom:10px; background:#f0f5f9; }.support-history .staff-message { background:#e5f3fb; }.support-history p { white-space:pre-wrap; overflow-wrap:anywhere; }.support-history small { color:#647789; }
+
+.edit-drawer { animation:none; }
