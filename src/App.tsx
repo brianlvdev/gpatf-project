@@ -90,7 +90,7 @@ function App() {
       supabase.from('attendance').select('*').eq('student_id', currentStudent.id).order('attendance_date', { ascending: false }),
       supabase.from('attendance_confirmations').select('*').eq('student_id', currentStudent.id).order('attendance_date', { ascending: false }),
       supabase.from('absence_justifications').select('*').eq('student_id', currentStudent.id).order('created_at', { ascending: false }),
-      supabase.from('announcements').select('*').eq('active', true).order('created_at', { ascending: false }),
+      supabase.from('announcements').select('*').is('removed_at',null).eq('active', true).order('created_at', { ascending: false }),
     ]);
     if (scheduleResponse.error || attendanceResponse.error || confirmationResponse.error || justificationResponse.error || announcementResponse.error) {
       setAuthError(genericError);
@@ -279,7 +279,7 @@ function App() {
     await loadAdminData();
   }
 
-  async function handleCreateAnnouncement(title: string, message: string, media?: { image_url: string | null; link_url: string | null }) {
+  async function handleCreateAnnouncement(title: string, message: string, media?: { kind: 'notice' | 'announcement'; image_url: string | null; link_url: string | null }) {
     const { error } = await supabase.from('announcements').insert({ title, message, ...media });
     if (error) throw new Error('announcement');
     await loadAdminData();
@@ -292,7 +292,7 @@ function App() {
   }
 
   async function handleDeleteAnnouncement(id: string) {
-    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    const { error } = await supabase.from('announcements').update({active:false,removed_at:new Date().toISOString()}).eq('id', id).select('id').single();
     if (error) throw new Error('announcement');
     await loadAdminData();
   }
