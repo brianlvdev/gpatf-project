@@ -1,3 +1,7 @@
+import { useSmoothView } from '@/lib/useSmoothView';
+import PageStage from './PageStage';
+import DeveloperHelp from './DeveloperHelp';
+import ImportantNotices from './ImportantNotices';
 import AttendanceManager from './AttendanceRoster';
 import SupportChat from './SupportChat';
 import TrainingPlans, { CollaboratorsList } from './TrainingPlans';
@@ -13,6 +17,8 @@ import { certificateStatus, CERTIFICATE_BUCKET, registerAccount, todayInSantaMar
 import { supabase } from '@/lib/supabase';
 
 interface AdminDashboardProps {
+  accountName: string;
+  accountRole: string;
   onRefreshStudents: () => Promise<void>;
   onRegisterStudent: (fields: FormData) => Promise<void>;
   onRegisterCollaborator?: (fields: FormData) => Promise<void>;
@@ -35,14 +41,14 @@ interface AdminDashboardProps {
   onSignOut: () => Promise<void>;
 }
 
-type AdminView = 'overview' | 'students' | 'agenda' | 'attendance' | 'announcements' | 'plans' | 'collaborators';
+type AdminView = 'overview' | 'students' | 'agenda' | 'attendance' | 'announcements' | 'plans' | 'collaborators' | 'messages';
 
 const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)).replace('.', '');
 const formatTime = (time: string) => time.slice(0, 5);
 
-export default function AdminDashboard({ onRefreshStudents, onRegisterStudent, onRegisterCollaborator, students, schedules, attendance, confirmations, justifications, announcements, onUpdateStudent, onSetStudentStatus, onCreateSchedule, onUpdateWorkoutPlan, onDeleteSchedule, onSetAttendance, onReviewJustification, onCreateAnnouncement, onToggleAnnouncement, onDeleteAnnouncement, onSignOut }: AdminDashboardProps) {
+export default function AdminDashboard({ accountName, accountRole, onRefreshStudents, onRegisterStudent, onRegisterCollaborator, students, schedules, attendance, confirmations, justifications, announcements, onUpdateStudent, onSetStudentStatus, onCreateSchedule, onUpdateWorkoutPlan, onDeleteSchedule, onSetAttendance, onReviewJustification, onCreateAnnouncement, onToggleAnnouncement, onDeleteAnnouncement, onSignOut }: AdminDashboardProps) {
   const [registration, setRegistration] = useState<'student' | 'collaborator' | null>(null);
-  const [activeView, setActiveView] = useState<AdminView>('overview');
+  const {view:activeView,loading:pageLoading,navigate:changeView} = useSmoothView<AdminView>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -58,7 +64,7 @@ export default function AdminDashboard({ onRefreshStudents, onRegisterStudent, o
   const filteredStudents = students.filter((student) => student.full_name.toLowerCase().includes(search.toLowerCase()) || (student.phone ?? '').includes(search));
 
   const navigate = (view: AdminView) => {
-    setActiveView(view);
+    changeView(view);
     setMenuOpen(false);
   };
 
@@ -84,26 +90,32 @@ export default function AdminDashboard({ onRefreshStudents, onRegisterStudent, o
     <div className="app-shell admin-shell">
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
         <button type="button" className="sidebar-brand home-brand" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><div className="logo-frame"><img src="/image.png" alt="Logo GPATF" /></div><div><strong>GPATF</strong><span>Administração</span></div></button>
-        <nav className="side-nav">
+        <nav className="side-nav" aria-label="Navegação da academia"><span className="nav-section-label">Academia</span>
           <button className={activeView === 'overview' ? 'active' : ''} onClick={() => navigate('overview')}><LayoutDashboard size={20} /> Visão geral</button>
           <button className={activeView === 'students' ? 'active' : ''} onClick={() => navigate('students')}><Users size={20} /> Alunos <span className="nav-count">{activeStudents.length}</span></button>
           <button className={activeView === 'plans' ? 'active' : ''} onClick={() => navigate('plans')}><FileText size={20} /> Fichas de treino</button>
-          <button className={activeView === 'collaborators' ? 'active' : ''} onClick={() => navigate('collaborators')}><Users size={20} /> Colaboradores</button>
+
           <button className={activeView === 'agenda' ? 'active' : ''} onClick={() => navigate('agenda')}><CalendarDays size={20} /> Agenda</button>
           <button className={activeView === 'attendance' ? 'active' : ''} onClick={() => navigate('attendance')}><CheckCircle2 size={20} /> Presença</button>
+          <span className="nav-section-label">Equipe e comunicação</span><button className={activeView === 'collaborators' ? 'active' : ''} onClick={() => navigate('collaborators')}><Users size={20} /> Colaboradores</button>
           <button className={activeView === 'announcements' ? 'active' : ''} onClick={() => navigate('announcements')}><Bell size={20} /> Anúncios e avisos</button>
+        <button className={activeView === 'messages' ? 'active' : ''} onClick={() => navigate('messages')}><Bell size={20} /> Mensagens</button>
         </nav>
-        <SupportChat students={students} sidebar /><div className="admin-side-status"><div className="status-pulse" /><div><strong>Painel ativo</strong><span>Dados atualizados</span></div></div>
-        {onRegisterCollaborator && <button type="button" className="primary-button sidebar-add" onClick={() => { setMenuOpen(false); setRegistration('collaborator'); }}><Plus size={18} /> Adicionar colaborador</button>}
-        <button type="button" className="logout-button" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
+        <div className="sidebar-registration-actions" aria-label="Cadastros">
+          <span className="nav-section-label">Cadastros</span>
+          <button type="button" className="primary-button sidebar-add" onClick={() => { setMenuOpen(false); setRegistration('student'); }}><Plus size={18} /> Cadastrar aluno</button>
+          {onRegisterCollaborator && <button type="button" className="outline-button sidebar-add-collaborator" onClick={() => { setMenuOpen(false); setRegistration('collaborator'); }}><Plus size={18} /> Adicionar colaborador</button>}
+        </div>
+        <div className="admin-sidebar-footer"><DeveloperHelp onOpen={() => setMenuOpen(false)} />
+          <button type="button" className="logout-button" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
+        </div>
       </aside>
       {menuOpen && <button className="sidebar-overlay" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
       <main className="main-content">
-        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : activeView === 'plans' ? 'Fichas de treino' : activeView === 'collaborators' ? 'Colaboradores' : 'Anúncios e avisos'}</strong></div><div className="admin-header-actions">
-
-          <button type="button" className="primary-button" onClick={() => setRegistration('student')}><Plus size={18} aria-hidden="true" /> Cadastrar aluno</button>
-        </div><div className="topbar-user"><SupportChat students={students} /><div className="avatar avatar-small admin-avatar"><ShieldCheck size={17} /></div><span>Equipe GPATF</span></div></header>
+        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : activeView === 'plans' ? 'Fichas de treino' : activeView === 'collaborators' ? 'Colaboradores' : activeView === 'messages' ? 'Mensagens' : 'Anúncios e avisos'}</strong></div><div className="session-summary" aria-label="Sessão conectada"><strong>{accountName}</strong><span>{accountRole} · Sessão ativa</span></div><div className="topbar-user"><SupportChat students={students} onOpenMessages={() => navigate('messages')} /></div></header>
         {activeView !== 'overview' && <button className="outline-button back-overview" onClick={() => navigate('overview')}>Voltar à visão geral</button>}
+        <PageStage loading={pageLoading} view={activeView}>
+        {activeView === 'messages' && <section className="view-section messages-view"><div className="section-title-row"><div><p className="eyebrow">Atendimento GPATF</p><h1>Mensagens</h1><p className="section-lede">Acompanhe suas conversas e respostas.</p></div></div><SupportChat students={students} embedded /></section>}
         {feedback && <div className="toast"><CheckCircle2 size={18} /> {feedback}</div>}
 
         {activeView === 'overview' && <AdminOverview students={students} todaysSchedules={todaysSchedules} pendingJustifications={pendingJustifications} announcements={announcements} onNavigate={navigate} onReviewJustification={onReviewJustification} onCreateAnnouncement={onCreateAnnouncement} />}
@@ -113,6 +125,7 @@ export default function AdminDashboard({ onRefreshStudents, onRegisterStudent, o
         {activeView === 'announcements' && <AnnouncementsManager announcements={announcements} onCreate={onCreateAnnouncement} onToggle={onToggleAnnouncement} onDelete={onDeleteAnnouncement} />}
         {activeView === 'plans' && <TrainingPlans students={students} />}
         {activeView === 'collaborators' && <CollaboratorsList key={registration ?? 'team'} />}
+        </PageStage>
       </main>
       {registration && <RegistrationDrawer key={registration} kind={registration} onClose={() => setRegistration(null)} onSubmit={async (fields) => {
         if (registration === 'student') await onRegisterStudent(fields);
@@ -137,7 +150,7 @@ function AdminOverview({ students, todaysSchedules, pendingJustifications, annou
     setReviewing('');
   };
 
-  return <section className="view-section"><section className="admin-welcome"><div><p className="eyebrow">Painel da equipe</p><h1>Bom trabalho hoje.</h1><p className="section-lede">Aqui está um resumo da Academia GPATF.</p></div><div className="admin-date"><span>Hoje</span><strong>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long' }).format(new Date())}</strong></div></section><label className="field-label plan-search">Pesquisar aluno nos resumos<input type="search" value={summarySearch} onChange={e=>setSummarySearch(e.target.value)} /></label><AnnouncementCarousel announcements={announcements} /><section className="metric-grid admin-metrics"><div className="metric-card"><div className="metric-icon blue"><Users size={21} /></div><div><strong>{activeStudents}</strong><span>alunos ativos</span></div><button onClick={() => onNavigate('students')}><ChevronRight size={17} /></button></div><div className="metric-card"><div className="metric-icon green"><CalendarDays size={21} /></div><div><strong>{todaysSchedules.length}</strong><span>treinos hoje</span></div><button onClick={() => onNavigate('agenda')}><ChevronRight size={17} /></button></div><div className="metric-card"><div className="metric-icon sand"><FileText size={21} /></div><div><strong>{pendingJustifications.length}</strong><span>justificativas pendentes</span></div><button onClick={() => onNavigate('attendance')}><ChevronRight size={17} /></button></div></section><div className="dashboard-grid admin-grid"><section className="content-card"><div className="card-heading"><div><p className="eyebrow">Atenção da equipe</p><h2>Justificativas recentes</h2></div><button className="link-button" onClick={() => onNavigate('attendance')}>Ver todas <ChevronRight size={16} /></button></div>{pendingJustifications.length ? pendingJustifications.filter(i=>matchesStudent(i.student_id)).slice(0, 4).map((item) => <div className="review-row" key={item.id}><div className="review-avatar"><FileText size={18} /></div><div className="review-main"><strong>{students.find((student) => student.id === item.student_id)?.full_name ?? 'Aluno'}</strong><span>{formatDate(item.absence_date)} · {item.reason}</span></div><div className="review-actions"><button className="icon-action success" disabled={reviewing === item.id} onClick={() => review(item, 'approved')} aria-label="Aprovar"><Check size={17} /></button><button className="icon-action danger" disabled={reviewing === item.id} onClick={() => review(item, 'rejected')} aria-label="Recusar"><X size={17} /></button></div></div>) : <div className="empty-state compact-empty"><CheckCircle2 size={28} /><strong>Tudo em dia</strong><p>Nenhuma justificativa aguardando análise.</p></div>}</section><section className="content-card notice-admin-card"><div className="card-heading"><div><p className="eyebrow">Comunicação</p><h2>Aviso na tela principal</h2></div><Bell size={21} className="heading-icon" /></div>{announcements.length ? <div className="active-notice"><span className="notice-live"><span /> Publicado</span><h3>{announcements[0].title}</h3><p>{announcements[0].message}</p></div> : <div className="empty-state compact-empty"><Bell size={28} /><p>Nenhum aviso publicado.</p></div>}<button className="outline-button full-button" onClick={() => onNavigate('announcements')}>Gerenciar anúncios</button></section></div><section className="content-card today-card"><div className="card-heading"><div><p className="eyebrow">Agenda de hoje</p><h2>Treinos programados</h2></div><button className="link-button" onClick={() => onNavigate('agenda')}>Gerenciar agenda <ChevronRight size={16} /></button></div>{todaysSchedules.length ? <div className="today-grid">{todaysSchedules.filter(i=>matchesStudent(i.student_id)).map((schedule) => <div className="today-item" key={schedule.id}><span>{formatTime(schedule.start_time)}</span><div><strong>{schedule.title}</strong><small>{students.find((student) => student.id === schedule.student_id)?.full_name ?? 'Aluno'}</small></div><Clock3 size={16} /></div>)}</div> : <p className="muted-text">Nenhum treino marcado para hoje.</p>}</section></section>;
+  return <section className="view-section"><ImportantNotices announcements={announcements} /><section className="admin-welcome"><div><p className="eyebrow">Painel da equipe</p><h1>Bom trabalho hoje.</h1><p className="section-lede">Aqui está um resumo da Academia GPATF.</p></div><div className="admin-date"><span>Hoje</span><strong>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long' }).format(new Date())}</strong></div></section><label className="field-label plan-search">Pesquisar aluno nos resumos<input type="search" value={summarySearch} onChange={e=>setSummarySearch(e.target.value)} /></label><section className="metric-grid admin-metrics"><div className="metric-card"><div className="metric-icon blue"><Users size={21} /></div><div><strong>{activeStudents}</strong><span>alunos ativos</span></div><button onClick={() => onNavigate('students')}><ChevronRight size={17} /></button></div><div className="metric-card"><div className="metric-icon green"><CalendarDays size={21} /></div><div><strong>{todaysSchedules.length}</strong><span>treinos hoje</span></div><button onClick={() => onNavigate('agenda')}><ChevronRight size={17} /></button></div><div className="metric-card"><div className="metric-icon sand"><FileText size={21} /></div><div><strong>{pendingJustifications.length}</strong><span>justificativas pendentes</span></div><button onClick={() => onNavigate('attendance')}><ChevronRight size={17} /></button></div></section><div className="dashboard-grid admin-grid"><section className="content-card"><div className="card-heading"><div><p className="eyebrow">Atenção da equipe</p><h2>Justificativas recentes</h2></div><button className="link-button" onClick={() => onNavigate('attendance')}>Ver todas <ChevronRight size={16} /></button></div>{pendingJustifications.length ? pendingJustifications.filter(i=>matchesStudent(i.student_id)).slice(0, 4).map((item) => <div className="review-row" key={item.id}><div className="review-avatar"><FileText size={18} /></div><div className="review-main"><strong>{students.find((student) => student.id === item.student_id)?.full_name ?? 'Aluno'}</strong><span>{formatDate(item.absence_date)} · {item.reason}</span></div><div className="review-actions"><button className="icon-action success" disabled={reviewing === item.id} onClick={() => review(item, 'approved')} aria-label="Aprovar"><Check size={17} /></button><button className="icon-action danger" disabled={reviewing === item.id} onClick={() => review(item, 'rejected')} aria-label="Recusar"><X size={17} /></button></div></div>) : <div className="empty-state compact-empty"><CheckCircle2 size={28} /><strong>Tudo em dia</strong><p>Nenhuma justificativa aguardando análise.</p></div>}</section><section className="content-card notice-admin-card"><div className="card-heading"><div><p className="eyebrow">Comunicação</p><h2>Comunicação da academia</h2></div><Bell size={21} className="heading-icon" /></div><p className="muted-text">Avisos importantes ficam no topo da visão geral. Anúncios aparecem no carrossel de novidades.</p><button className="outline-button full-button" onClick={() => onNavigate('announcements')}>Gerenciar anúncios</button></section></div><AnnouncementCarousel announcements={announcements} /><section className="content-card today-card"><div className="card-heading"><div><p className="eyebrow">Agenda de hoje</p><h2>Treinos programados</h2></div><button className="link-button" onClick={() => onNavigate('agenda')}>Gerenciar agenda <ChevronRight size={16} /></button></div>{todaysSchedules.length ? <div className="today-grid">{todaysSchedules.filter(i=>matchesStudent(i.student_id)).map((schedule) => <div className="today-item" key={schedule.id}><span>{formatTime(schedule.start_time)}</span><div><strong>{schedule.title}</strong><small>{students.find((student) => student.id === schedule.student_id)?.full_name ?? 'Aluno'}</small></div><Clock3 size={16} /></div>)}</div> : <p className="muted-text">Nenhum treino marcado para hoje.</p>}</section></section>;
 }
 
 function StudentAdminRow({ student, onEdit, onStatus }: { student: Student; onEdit: () => void; onStatus: (student: Student, status: StudentStatus) => void }) {

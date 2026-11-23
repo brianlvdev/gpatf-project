@@ -88,6 +88,7 @@ export default function AuthScreen({ onLogin, onSignup, isLoading, error, notice
             </form>
           )}
         </div>
+        {mode === 'login' && <a className="outline-button auth-linktree" href="https://linktr.ee/GPATF_CEFD" target="_blank" rel="noopener noreferrer">Conheça o GPATF no Linktree</a>}
         <p className="auth-note">Ao continuar, seus dados serão usados apenas para acompanhar sua rotina na Academia GPATF.</p>
       </section>
     </main>

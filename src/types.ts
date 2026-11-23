@@ -67,6 +67,8 @@ export interface AbsenceJustification {
 }
 
 export interface Announcement {
+  kind: 'notice' | 'announcement';
+  removed_at: string | null;
   image_url: string | null;
   link_url: string | null;
   id: string;
