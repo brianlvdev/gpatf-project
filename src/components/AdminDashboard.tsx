@@ -1,3 +1,4 @@
+import DeveloperHelp from './DeveloperHelp';
 import ImportantNotices from './ImportantNotices';
 import AttendanceManager from './AttendanceRoster';
 import SupportChat from './SupportChat';
@@ -14,6 +15,8 @@ import { certificateStatus, CERTIFICATE_BUCKET, registerAccount, todayInSantaMar
 import { supabase } from '@/lib/supabase';
 
 interface AdminDashboardProps {
+  accountName: string;
+  accountRole: string;
   onRefreshStudents: () => Promise<void>;
   onRegisterStudent: (fields: FormData) => Promise<void>;
   onRegisterCollaborator?: (fields: FormData) => Promise<void>;
@@ -41,7 +44,7 @@ type AdminView = 'overview' | 'students' | 'agenda' | 'attendance' | 'announceme
 const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)).replace('.', '');
 const formatTime = (time: string) => time.slice(0, 5);
 
-export default function AdminDashboard({ onRefreshStudents, onRegisterStudent, onRegisterCollaborator, students, schedules, attendance, confirmations, justifications, announcements, onUpdateStudent, onSetStudentStatus, onCreateSchedule, onUpdateWorkoutPlan, onDeleteSchedule, onSetAttendance, onReviewJustification, onCreateAnnouncement, onToggleAnnouncement, onDeleteAnnouncement, onSignOut }: AdminDashboardProps) {
+export default function AdminDashboard({ accountName, accountRole, onRefreshStudents, onRegisterStudent, onRegisterCollaborator, students, schedules, attendance, confirmations, justifications, announcements, onUpdateStudent, onSetStudentStatus, onCreateSchedule, onUpdateWorkoutPlan, onDeleteSchedule, onSetAttendance, onReviewJustification, onCreateAnnouncement, onToggleAnnouncement, onDeleteAnnouncement, onSignOut }: AdminDashboardProps) {
   const [registration, setRegistration] = useState<'student' | 'collaborator' | null>(null);
   const [activeView, setActiveView] = useState<AdminView>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -85,26 +88,29 @@ export default function AdminDashboard({ onRefreshStudents, onRegisterStudent, o
     <div className="app-shell admin-shell">
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
         <button type="button" className="sidebar-brand home-brand" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><div className="logo-frame"><img src="/image.png" alt="Logo GPATF" /></div><div><strong>GPATF</strong><span>Administração</span></div></button>
-        <nav className="side-nav">
+        <nav className="side-nav" aria-label="Navegação da academia"><span className="nav-section-label">Academia</span>
           <button className={activeView === 'overview' ? 'active' : ''} onClick={() => navigate('overview')}><LayoutDashboard size={20} /> Visão geral</button>
           <button className={activeView === 'students' ? 'active' : ''} onClick={() => navigate('students')}><Users size={20} /> Alunos <span className="nav-count">{activeStudents.length}</span></button>
           <button className={activeView === 'plans' ? 'active' : ''} onClick={() => navigate('plans')}><FileText size={20} /> Fichas de treino</button>
-          <button className={activeView === 'collaborators' ? 'active' : ''} onClick={() => navigate('collaborators')}><Users size={20} /> Colaboradores</button>
+
           <button className={activeView === 'agenda' ? 'active' : ''} onClick={() => navigate('agenda')}><CalendarDays size={20} /> Agenda</button>
           <button className={activeView === 'attendance' ? 'active' : ''} onClick={() => navigate('attendance')}><CheckCircle2 size={20} /> Presença</button>
+          <span className="nav-section-label">Equipe e comunicação</span><button className={activeView === 'collaborators' ? 'active' : ''} onClick={() => navigate('collaborators')}><Users size={20} /> Colaboradores</button>
           <button className={activeView === 'announcements' ? 'active' : ''} onClick={() => navigate('announcements')}><Bell size={20} /> Anúncios e avisos</button>
         <button className={activeView === 'messages' ? 'active' : ''} onClick={() => navigate('messages')}><Bell size={20} /> Mensagens</button>
         </nav>
-        <SupportChat students={students} sidebar onSent={() => navigate('messages')} /><div className="admin-side-status"><div className="status-pulse" /><div><strong>Painel ativo</strong><span>Dados atualizados</span></div></div>
-        {onRegisterCollaborator && <button type="button" className="primary-button sidebar-add" onClick={() => { setMenuOpen(false); setRegistration('collaborator'); }}><Plus size={18} /> Adicionar colaborador</button>}
-        <button type="button" className="logout-button" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
+        <div className="sidebar-registration-actions" aria-label="Cadastros">
+          <span className="nav-section-label">Cadastros</span>
+          <button type="button" className="primary-button sidebar-add" onClick={() => { setMenuOpen(false); setRegistration('student'); }}><Plus size={18} /> Cadastrar aluno</button>
+          {onRegisterCollaborator && <button type="button" className="outline-button sidebar-add-collaborator" onClick={() => { setMenuOpen(false); setRegistration('collaborator'); }}><Plus size={18} /> Adicionar colaborador</button>}
+        </div>
+        <div className="admin-sidebar-footer"><DeveloperHelp onOpen={() => setMenuOpen(false)} />
+          <button type="button" className="logout-button" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
+        </div>
       </aside>
       {menuOpen && <button className="sidebar-overlay" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
       <main className="main-content">
-        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : activeView === 'plans' ? 'Fichas de treino' : activeView === 'collaborators' ? 'Colaboradores' : activeView === 'messages' ? 'Mensagens' : 'Anúncios e avisos'}</strong></div><div className="admin-header-actions">
-
-          <button type="button" className="primary-button" onClick={() => setRegistration('student')}><Plus size={18} aria-hidden="true" /> Cadastrar aluno</button>
-        </div><div className="topbar-user"><SupportChat students={students} onOpenMessages={() => navigate('messages')} /><div className="avatar avatar-small admin-avatar"><ShieldCheck size={17} /></div><span>Equipe GPATF</span></div></header>
+        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : activeView === 'plans' ? 'Fichas de treino' : activeView === 'collaborators' ? 'Colaboradores' : activeView === 'messages' ? 'Mensagens' : 'Anúncios e avisos'}</strong></div><div className="session-summary" aria-label="Sessão conectada"><strong>{accountName}</strong><span>{accountRole} · Sessão ativa</span></div><div className="topbar-user"><SupportChat students={students} onOpenMessages={() => navigate('messages')} /></div></header>
         {activeView !== 'overview' && <button className="outline-button back-overview" onClick={() => navigate('overview')}>Voltar à visão geral</button>}
         <div key={activeView} className="page-transition">
         {activeView === 'messages' && <section className="view-section messages-view"><div className="section-title-row"><div><p className="eyebrow">Atendimento GPATF</p><h1>Mensagens</h1><p className="section-lede">Acompanhe suas conversas e respostas.</p></div></div><SupportChat students={students} embedded /></section>}
