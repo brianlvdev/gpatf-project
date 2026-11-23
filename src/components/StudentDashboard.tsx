@@ -31,7 +31,7 @@ const formatTime = (time: string) => time.slice(0, 5);
 export default function StudentDashboard({ student, schedules, attendance, confirmations, justifications, announcements, avatarUrl, onEditProfile, onUploadCertificate, onUploadAvatar, onConfirmPresence, onSubmitJustification, onSignOut }: StudentDashboardProps) {
   const [presenceBusy, setPresenceBusy] = useState(false);
   async function togglePresence(schedule: WorkoutSchedule) { if(presenceBusy) return; setPresenceBusy(true); try { await onConfirmPresence(schedule); } catch { setMessage('Não foi possível atualizar a presença. Tente novamente.'); } finally { setPresenceBusy(false); } }
-  const [activeView, setActiveView] = useState<'overview' | 'agenda' | 'profile' | 'absence'>('overview');
+  const [activeView, setActiveView] = useState<'overview' | 'agenda' | 'profile' | 'absence' | 'messages'>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [absenceDate, setAbsenceDate] = useState('');
   const [absenceReason, setAbsenceReason] = useState('');
@@ -60,7 +60,7 @@ export default function StudentDashboard({ student, schedules, attendance, confi
     }
   };
 
-  const navigate = (view: 'overview' | 'agenda' | 'profile' | 'absence') => {
+  const navigate = (view: 'overview' | 'agenda' | 'profile' | 'absence' | 'messages') => {
     setActiveView(view);
     setMenuOpen(false);
   };
@@ -74,17 +74,20 @@ export default function StudentDashboard({ student, schedules, attendance, confi
           <button className={activeView === 'agenda' ? 'active' : ''} onClick={() => navigate('agenda')}><CalendarDays size={20} /> Minha agenda</button>
           <button className={activeView === 'profile' ? 'active' : ''} onClick={() => navigate('profile')}><UserRound size={20} /> Minha ficha</button>
           <button className={activeView === 'absence' ? 'active' : ''} onClick={() => navigate('absence')}><FileText size={20} /> Justificar falta</button>
+        <button className={activeView === 'messages' ? 'active' : ''} onClick={() => navigate('messages')}><Bell size={20} /> Mensagens</button>
         </nav>
-        <SupportChat student={student} />
+        <SupportChat student={student} onSent={() => navigate('messages')} />
+        <a className="outline-button sidebar-learn-more" href="https://linktr.ee/GPATF_CEFD" target="_blank" rel="noopener noreferrer">Saiba mais sobre o GPATF</a>
         <button type="button" className="logout-button" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
       </aside>
       {menuOpen && <button className="sidebar-overlay" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
 
       <main className="main-content">{message && <p role="status" className="alert">{message}</p>}
-        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Área do aluno</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'agenda' ? 'Minha agenda' : activeView === 'absence' ? 'Justificar falta' : 'Minha ficha'}</strong></div><div className="topbar-user"><SupportChat student={student} compact /><button className="profile-shortcut" onClick={() => navigate('profile')} aria-label="Abrir meu perfil"><div className="avatar avatar-small">{avatarUrl ? <img src={avatarUrl} alt="Foto de perfil" /> : <UserRound size={17} />}</div><span>{student.full_name.split(' ')[0]}</span></button></div></header>
+        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Área do aluno</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'agenda' ? 'Minha agenda' : activeView === 'absence' ? 'Justificar falta' : activeView === 'messages' ? 'Mensagens' : 'Minha ficha'}</strong></div><div className="topbar-user"><SupportChat student={student} compact onOpenMessages={() => navigate('messages')} /><button className="profile-shortcut" onClick={() => navigate('profile')} aria-label="Abrir meu perfil"><div className="avatar avatar-small">{avatarUrl ? <img src={avatarUrl} alt="Foto de perfil" /> : <UserRound size={17} />}</div><span>{student.full_name.split(' ')[0]}</span></button></div></header>
         {activeView !== 'overview' && <button className="outline-button back-overview" onClick={() => navigate('overview')}>Voltar à visão geral</button>}
 
         <div key={activeView} className="page-transition">
+        {activeView === 'messages' && <section className="view-section messages-view"><div className="section-title-row"><div><p className="eyebrow">Atendimento GPATF</p><h1>Mensagens</h1><p className="section-lede">Acompanhe suas conversas e respostas.</p></div></div><SupportChat student={student} embedded /></section>}
         {activeView === 'overview' && <>
           <ImportantNotices announcements={announcements} />
           <section className="welcome-row"><div><p className="eyebrow">Bom te ver por aqui</p><h1>Olá, {student.full_name.split(' ')[0]}.</h1><p className="section-lede">Seu cuidado começa com um passo de cada vez.</p></div><div className="welcome-date"><CalendarDays size={18} /><span>{new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</span></div></section>

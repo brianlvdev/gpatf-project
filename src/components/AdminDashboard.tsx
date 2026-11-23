@@ -36,7 +36,7 @@ interface AdminDashboardProps {
   onSignOut: () => Promise<void>;
 }
 
-type AdminView = 'overview' | 'students' | 'agenda' | 'attendance' | 'announcements' | 'plans' | 'collaborators';
+type AdminView = 'overview' | 'students' | 'agenda' | 'attendance' | 'announcements' | 'plans' | 'collaborators' | 'messages';
 
 const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)).replace('.', '');
 const formatTime = (time: string) => time.slice(0, 5);
@@ -93,19 +93,21 @@ export default function AdminDashboard({ onRefreshStudents, onRegisterStudent, o
           <button className={activeView === 'agenda' ? 'active' : ''} onClick={() => navigate('agenda')}><CalendarDays size={20} /> Agenda</button>
           <button className={activeView === 'attendance' ? 'active' : ''} onClick={() => navigate('attendance')}><CheckCircle2 size={20} /> Presença</button>
           <button className={activeView === 'announcements' ? 'active' : ''} onClick={() => navigate('announcements')}><Bell size={20} /> Anúncios e avisos</button>
+        <button className={activeView === 'messages' ? 'active' : ''} onClick={() => navigate('messages')}><Bell size={20} /> Mensagens</button>
         </nav>
-        <SupportChat students={students} sidebar /><div className="admin-side-status"><div className="status-pulse" /><div><strong>Painel ativo</strong><span>Dados atualizados</span></div></div>
+        <SupportChat students={students} sidebar onSent={() => navigate('messages')} /><div className="admin-side-status"><div className="status-pulse" /><div><strong>Painel ativo</strong><span>Dados atualizados</span></div></div>
         {onRegisterCollaborator && <button type="button" className="primary-button sidebar-add" onClick={() => { setMenuOpen(false); setRegistration('collaborator'); }}><Plus size={18} /> Adicionar colaborador</button>}
         <button type="button" className="logout-button" onClick={onSignOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
       </aside>
       {menuOpen && <button className="sidebar-overlay" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
       <main className="main-content">
-        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : activeView === 'plans' ? 'Fichas de treino' : activeView === 'collaborators' ? 'Colaboradores' : 'Anúncios e avisos'}</strong></div><div className="admin-header-actions">
+        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : activeView === 'plans' ? 'Fichas de treino' : activeView === 'collaborators' ? 'Colaboradores' : activeView === 'messages' ? 'Mensagens' : 'Anúncios e avisos'}</strong></div><div className="admin-header-actions">
 
           <button type="button" className="primary-button" onClick={() => setRegistration('student')}><Plus size={18} aria-hidden="true" /> Cadastrar aluno</button>
-        </div><div className="topbar-user"><SupportChat students={students} /><div className="avatar avatar-small admin-avatar"><ShieldCheck size={17} /></div><span>Equipe GPATF</span></div></header>
+        </div><div className="topbar-user"><SupportChat students={students} onOpenMessages={() => navigate('messages')} /><div className="avatar avatar-small admin-avatar"><ShieldCheck size={17} /></div><span>Equipe GPATF</span></div></header>
         {activeView !== 'overview' && <button className="outline-button back-overview" onClick={() => navigate('overview')}>Voltar à visão geral</button>}
         <div key={activeView} className="page-transition">
+        {activeView === 'messages' && <section className="view-section messages-view"><div className="section-title-row"><div><p className="eyebrow">Atendimento GPATF</p><h1>Mensagens</h1><p className="section-lede">Acompanhe suas conversas e respostas.</p></div></div><SupportChat students={students} embedded /></section>}
         {feedback && <div className="toast"><CheckCircle2 size={18} /> {feedback}</div>}
 
         {activeView === 'overview' && <AdminOverview students={students} todaysSchedules={todaysSchedules} pendingJustifications={pendingJustifications} announcements={announcements} onNavigate={navigate} onReviewJustification={onReviewJustification} onCreateAnnouncement={onCreateAnnouncement} />}
