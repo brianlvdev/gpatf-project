@@ -1,3 +1,4 @@
+import NotificationCenter from './NotificationCenter';
 import { useSmoothView } from '@/lib/useSmoothView';
 import PageStage from './PageStage';
 import DeveloperHelp from './DeveloperHelp';
@@ -8,7 +9,7 @@ import TrainingPlans, { CollaboratorsList } from './TrainingPlans';
 import AnnouncementsManager, { CreateAnnouncement } from './AnnouncementsManager';
 import AnnouncementCarousel from './AnnouncementCarousel';
 import { FormEvent, useState } from 'react';
-import { Archive, Bell, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, FileText, LayoutDashboard, LogOut, Menu, Pencil, Plus, Search, ShieldCheck, Trash2, UserRound, Users, X } from 'lucide-react';
+import { Archive, Bell, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, FileText, LayoutDashboard, LogOut, Menu, MessageCircle, Pencil, Plus, Search, ShieldCheck, Trash2, UserRound, Users, X } from 'lucide-react';
 import { AbsenceJustification, Announcement, Attendance, AttendanceConfirmation, AttendanceStatus, Student, StudentStatus, WorkoutSchedule } from '@/types';
 
 import CertificateFields from '@/components/CertificateFields';
@@ -99,7 +100,7 @@ export default function AdminDashboard({ accountName, accountRole, onRefreshStud
           <button className={activeView === 'attendance' ? 'active' : ''} onClick={() => navigate('attendance')}><CheckCircle2 size={20} /> Presença</button>
           <span className="nav-section-label">Equipe e comunicação</span><button className={activeView === 'collaborators' ? 'active' : ''} onClick={() => navigate('collaborators')}><Users size={20} /> Colaboradores</button>
           <button className={activeView === 'announcements' ? 'active' : ''} onClick={() => navigate('announcements')}><Bell size={20} /> Anúncios e avisos</button>
-        <button className={activeView === 'messages' ? 'active' : ''} onClick={() => navigate('messages')}><Bell size={20} /> Mensagens</button>
+        <button className={activeView === 'messages' ? 'active' : ''} onClick={() => navigate('messages')}><MessageCircle size={20} /> Mensagens</button>
         </nav>
         <div className="sidebar-registration-actions" aria-label="Cadastros">
           <span className="nav-section-label">Cadastros</span>
@@ -112,7 +113,7 @@ export default function AdminDashboard({ accountName, accountRole, onRefreshStud
       </aside>
       {menuOpen && <button className="sidebar-overlay" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
       <main className="main-content">
-        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : activeView === 'plans' ? 'Fichas de treino' : activeView === 'collaborators' ? 'Colaboradores' : activeView === 'messages' ? 'Mensagens' : 'Anúncios e avisos'}</strong></div><div className="session-summary" aria-label="Sessão conectada"><strong>{accountName}</strong><span>{accountRole} · Sessão ativa</span></div><div className="topbar-user"><SupportChat students={students} onOpenMessages={() => navigate('messages')} /></div></header>
+        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Administração</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'students' ? 'Alunos' : activeView === 'agenda' ? 'Agenda' : activeView === 'attendance' ? 'Controle de presença' : activeView === 'plans' ? 'Fichas de treino' : activeView === 'collaborators' ? 'Colaboradores' : activeView === 'messages' ? 'Mensagens' : 'Anúncios e avisos'}</strong></div><div className="session-summary" aria-label="Sessão conectada"><strong>{accountName}</strong><span>{accountRole} · Sessão ativa</span></div><div className="topbar-user"><NotificationCenter staff onNavigate={target => navigate(target === 'profile' || target === 'absence' ? 'students' : target)} /></div></header>
         {activeView !== 'overview' && <button className="outline-button back-overview" onClick={() => navigate('overview')}>Voltar à visão geral</button>}
         <PageStage loading={pageLoading} view={activeView}>
         {activeView === 'messages' && <section className="view-section messages-view"><div className="section-title-row"><div><p className="eyebrow">Atendimento GPATF</p><h1>Mensagens</h1><p className="section-lede">Acompanhe suas conversas e respostas.</p></div></div><SupportChat students={students} embedded /></section>}

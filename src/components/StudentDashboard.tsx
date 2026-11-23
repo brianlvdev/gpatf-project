@@ -1,3 +1,4 @@
+import NotificationCenter from './NotificationCenter';
 import { useSmoothView } from '@/lib/useSmoothView';
 import PageStage from './PageStage';
 import ImportantNotices from './ImportantNotices';
@@ -5,7 +6,7 @@ import SupportChat from './SupportChat';
 import AnnouncementCarousel from './AnnouncementCarousel';
 import { StudentTrainingPlan } from './TrainingPlans';
 import { FormEvent, useMemo, useState } from 'react';
-import { Bell, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, FileText, HeartPulse, LogOut, MapPin, Menu, ShieldCheck, UserRound } from 'lucide-react';
+import { Bell, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, FileText, HeartPulse, LogOut, MapPin, Menu, MessageCircle, ShieldCheck, UserRound } from 'lucide-react';
 import { AbsenceJustification, Announcement, Attendance, AttendanceConfirmation, Student, WorkoutSchedule } from '@/types';
 
 import StudentProfileEditor from '@/components/StudentProfileEditor';
@@ -76,7 +77,7 @@ export default function StudentDashboard({ student, schedules, attendance, confi
           <button className={activeView === 'agenda' ? 'active' : ''} onClick={() => navigate('agenda')}><CalendarDays size={20} /> Minha agenda</button>
           <button className={activeView === 'profile' ? 'active' : ''} onClick={() => navigate('profile')}><UserRound size={20} /> Minha ficha</button>
           <button className={activeView === 'absence' ? 'active' : ''} onClick={() => navigate('absence')}><FileText size={20} /> Justificar falta</button>
-        <button className={activeView === 'messages' ? 'active' : ''} onClick={() => navigate('messages')}><Bell size={20} /> Mensagens</button>
+        <button className={activeView === 'messages' ? 'active' : ''} onClick={() => navigate('messages')}><MessageCircle size={20} /> Mensagens</button>
         </nav>
         <SupportChat student={student} onSent={() => navigate('messages')} />
         <a className="outline-button sidebar-learn-more" href="https://linktr.ee/GPATF_CEFD" target="_blank" rel="noopener noreferrer">Saiba mais sobre o GPATF</a>
@@ -85,7 +86,7 @@ export default function StudentDashboard({ student, schedules, attendance, confi
       {menuOpen && <button className="sidebar-overlay" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
 
       <main className="main-content">{message && <p role="status" className="alert">{message}</p>}
-        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Área do aluno</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'agenda' ? 'Minha agenda' : activeView === 'absence' ? 'Justificar falta' : activeView === 'messages' ? 'Mensagens' : 'Minha ficha'}</strong></div><div className="topbar-user"><SupportChat student={student} compact onOpenMessages={() => navigate('messages')} /><button className="profile-shortcut" onClick={() => navigate('profile')} aria-label="Abrir meu perfil"><div className="avatar avatar-small">{avatarUrl ? <img src={avatarUrl} alt="Foto de perfil" /> : <UserRound size={17} />}</div><span>{student.full_name.split(' ')[0]}</span></button></div></header>
+        <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}><Menu size={23} /></button><button type="button" className="topbar-logo" onClick={() => navigate('overview')} aria-label="GPATF, voltar ao início"><img src="/image.png" alt="" /></button><div className="topbar-context"><span>Área do aluno</span><strong>{activeView === 'overview' ? 'Visão geral' : activeView === 'agenda' ? 'Minha agenda' : activeView === 'absence' ? 'Justificar falta' : activeView === 'messages' ? 'Mensagens' : 'Minha ficha'}</strong></div><div className="topbar-user"><NotificationCenter staff={false} onNavigate={target => navigate(({messages:'messages',overview:'overview',agenda:'agenda',plans:'overview',students:'profile',attendance:'agenda',absence:'absence',profile:'profile',announcements:'overview'} as const)[target])} /><button className="profile-shortcut" onClick={() => navigate('profile')} aria-label="Abrir meu perfil"><div className="avatar avatar-small">{avatarUrl ? <img src={avatarUrl} alt="Foto de perfil" /> : <UserRound size={17} />}</div><span>{student.full_name.split(' ')[0]}</span></button></div></header>
         {activeView !== 'overview' && <button className="outline-button back-overview" onClick={() => navigate('overview')}>Voltar à visão geral</button>}
 
         <PageStage loading={pageLoading} view={activeView}>
